@@ -1,0 +1,38 @@
+{
+  "videoExtensions": [
+    ".mp4",
+    ".mov",
+    ".m4v",
+    ".avi",
+    ".mkv",
+    ".webm"
+  ],
+  "inputRoots": [
+    {
+      "id": "amano",
+      "displayName": "C Drive Videos",
+      "path": "/shared/inputs/amano",
+      "enabled": true
+    },
+    {
+      "id": "yutaro",
+      "displayName": "F Drive Videos",
+      "path": "/shared/inputs/yutaro",
+      "enabled": true
+    },
+    {
+      "id": "uploads",
+      "displayName": "Uploaded Files",
+      "path": "/shared/uploads",
+      "enabled": true
+    }
+  ],
+  "outputRoots": [
+    {
+      "id": "runs",
+      "displayName": "Runs",
+      "path": "/shared/outputs/default",
+      "enabled": true
+    }
+  ]
+}

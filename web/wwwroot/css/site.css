@@ -1,0 +1,12 @@
+html {
+  font-size: 16px;
+}
+
+body {
+  font-family: "Segoe UI", "Yu Gothic UI", "Hiragino Sans", sans-serif;
+}
+
+pre,
+code {
+  font-family: "Cascadia Code", Consolas, "SFMono-Regular", monospace;
+}

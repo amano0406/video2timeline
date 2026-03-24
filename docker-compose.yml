@@ -1,0 +1,62 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      VIDEO2TIMELINE_RUNTIME_DEFAULTS: /app/config/runtime.defaults.json
+      VIDEO2TIMELINE_APPDATA_ROOT: /shared/app-data
+      VIDEO2TIMELINE_UPLOADS_ROOT: /shared/uploads
+    ports:
+      - "${VIDEO2TIMELINE_WEB_PORT}:8080"
+    volumes:
+      - type: bind
+        source: ${VIDEO_SOURCE_1}
+        target: /shared/inputs/amano
+        read_only: true
+      - type: bind
+        source: ${VIDEO_SOURCE_2}
+        target: /shared/inputs/yutaro
+        read_only: true
+      - type: bind
+        source: ${VIDEO_OUTPUT_ROOT}
+        target: /shared/outputs
+      - app-data:/shared/app-data
+      - uploads:/shared/uploads
+    depends_on:
+      - worker
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/worker.Dockerfile
+    environment:
+      VIDEO2TIMELINE_RUNTIME_DEFAULTS: /app/config/runtime.defaults.json
+      VIDEO2TIMELINE_APPDATA_ROOT: /shared/app-data
+      VIDEO2TIMELINE_UPLOADS_ROOT: /shared/uploads
+      HF_HOME: /cache/huggingface
+      TRANSFORMERS_CACHE: /cache/huggingface
+      TORCH_HOME: /cache/torch
+    volumes:
+      - type: bind
+        source: ${VIDEO_SOURCE_1}
+        target: /shared/inputs/amano
+        read_only: true
+      - type: bind
+        source: ${VIDEO_SOURCE_2}
+        target: /shared/inputs/yutaro
+        read_only: true
+      - type: bind
+        source: ${VIDEO_OUTPUT_ROOT}
+        target: /shared/outputs
+      - app-data:/shared/app-data
+      - uploads:/shared/uploads
+      - hf-cache:/cache/huggingface
+      - torch-cache:/cache/torch
+
+volumes:
+  app-data:
+  uploads:
+  hf-cache:
+  torch-cache:

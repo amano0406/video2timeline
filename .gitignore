@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+runs/
+.env
+app-data/
+uploads/
+web/bin/
+web/obj/
+worker/.venv/
+worker/.pytest_cache/
+worker/__pycache__/

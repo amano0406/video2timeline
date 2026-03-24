@@ -1,0 +1,171 @@
+@page "/settings"
+@model Video2Timeline.Web.Pages.SettingsModel
+@using System.Text.Json
+@inject Video2Timeline.Web.Services.LanguageService LanguageService
+@inject Video2Timeline.Web.Services.JsonLocalizationService Localizer
+@{
+    var lang = LanguageService.Resolve(ViewContext.HttpContext.Request);
+    string L(string key) => Localizer.Get(lang, key);
+    string AccessLabel(string? value)
+    {
+        var key = $"access.{(value ?? string.Empty).ToLowerInvariant()}";
+        var label = L(key);
+        return label == key ? L("access.unknown") : label;
+    }
+
+    ViewData["Title"] = L("settings.page_title");
+
+    var jsMessages = new
+    {
+        saved = L("settings.saved"),
+        notSaved = L("settings.not_saved"),
+        confirmed = L("settings.confirmed"),
+        notConfirmed = L("settings.not_confirmed"),
+        saveFailed = L("settings.save_failed"),
+        saveSuccess = L("settings.save_success"),
+        accessAuthorized = L("access.authorized"),
+        accessTokenMissing = L("access.token_missing"),
+        accessConsentPending = L("access.consent_pending"),
+        accessUnauthorized = L("access.unauthorized"),
+        accessUnknown = L("access.unknown"),
+    };
+}
+
+<section class="space-y-8">
+    <div class="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+        <div class="space-y-2">
+            <h1 class="text-3xl font-semibold text-slate-900">Hugging Face / pyannote</h1>
+            <p class="text-sm text-slate-600">@L("settings.header.description")</p>
+        </div>
+    </div>
+
+    <section class="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm space-y-6">
+        <div class="grid gap-4 md:grid-cols-3">
+            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700">
+                <div class="font-medium text-slate-900">@L("settings.token")</div>
+                <div class="mt-1" id="token-state">@(Model.Snapshot.HasToken ? L("settings.saved") : L("settings.not_saved"))</div>
+            </div>
+            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700">
+                <div class="font-medium text-slate-900">@L("settings.consent")</div>
+                <div class="mt-1" id="terms-state">@(Model.Snapshot.TermsConfirmed ? L("settings.confirmed") : L("settings.not_confirmed"))</div>
+            </div>
+            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700">
+                <div class="font-medium text-slate-900">@L("settings.model_access")</div>
+                <div class="mt-1" id="access-state">@AccessLabel(Model.Snapshot.AccessState)</div>
+            </div>
+        </div>
+
+        <div class="rounded-2xl border border-sky-200 bg-sky-50 p-5 text-sm text-sky-900">
+            <p class="font-medium">@L("settings.notice.title")</p>
+            <p class="mt-2 text-sky-800">@L("settings.notice.description")</p>
+            <div class="mt-4 flex flex-wrap gap-3">
+                <a class="inline-flex items-center rounded-full bg-sky-700 px-4 py-2 font-medium text-white transition hover:bg-sky-600"
+                   href="@Model.TokenSettingsUrl"
+                   target="_blank"
+                   rel="noreferrer">
+                    @L("settings.open_token")
+                </a>
+                <a class="inline-flex items-center rounded-full bg-white px-4 py-2 font-medium text-sky-700 ring-1 ring-inset ring-sky-300 transition hover:bg-sky-100"
+                   href="@Model.PyannoteModelUrl"
+                   target="_blank"
+                   rel="noreferrer">
+                    @L("settings.open_approval")
+                </a>
+            </div>
+        </div>
+
+        <div class="space-y-4">
+            <div class="space-y-2">
+                <label class="text-sm font-medium text-slate-900" for="hf-token">@L("settings.token")</label>
+                <input id="hf-token"
+                       type="password"
+                       placeholder="hf_..."
+                       class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-700" />
+                <p class="text-xs text-slate-500">@L("settings.token_hint")</p>
+            </div>
+
+            <label class="flex items-start gap-3 rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-700">
+                <input id="terms-confirmed"
+                       type="checkbox"
+                       @(Model.Snapshot.TermsConfirmed ? "checked" : null)
+                       class="mt-1 h-4 w-4 rounded border-slate-300 text-slate-900" />
+                <span>@L("settings.terms_label")</span>
+            </label>
+        </div>
+
+        <div id="save-notice" class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            @L("settings.status_refresh")
+        </div>
+    </section>
+</section>
+
+<script>
+    (() => {
+        const messages = @Html.Raw(JsonSerializer.Serialize(jsMessages));
+        const tokenInput = document.getElementById("hf-token");
+        const termsCheckbox = document.getElementById("terms-confirmed");
+        const tokenState = document.getElementById("token-state");
+        const termsState = document.getElementById("terms-state");
+        const accessState = document.getElementById("access-state");
+        const notice = document.getElementById("save-notice");
+
+        const accessMessage = (state) => {
+            switch ((state ?? "").toLowerCase()) {
+                case "authorized": return messages.accessAuthorized;
+                case "token_missing": return messages.accessTokenMissing;
+                case "consent_pending": return messages.accessConsentPending;
+                case "unauthorized": return messages.accessUnauthorized;
+                default: return messages.accessUnknown;
+            }
+        };
+
+        const renderSnapshot = (snapshot, noticeText) => {
+            tokenState.textContent = snapshot.hasToken ? messages.saved : messages.notSaved;
+            termsState.textContent = snapshot.termsConfirmed ? messages.confirmed : messages.notConfirmed;
+            accessState.textContent = accessMessage(snapshot.accessState);
+            if (typeof snapshot.termsConfirmed === "boolean") {
+                termsCheckbox.checked = snapshot.termsConfirmed;
+            }
+            if (noticeText) {
+                notice.textContent = noticeText;
+            }
+        };
+
+        const save = async () => {
+            const token = tokenInput.value.trim();
+            const response = await fetch("/api/settings/huggingface", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    token: token.length > 0 ? token : null,
+                    termsConfirmed: termsCheckbox.checked
+                })
+            });
+
+            if (!response.ok) {
+                notice.textContent = messages.saveFailed;
+                return;
+            }
+
+            const snapshot = await response.json();
+            tokenInput.value = "";
+            renderSnapshot(snapshot, messages.saveSuccess);
+        };
+
+        tokenInput.addEventListener("change", () => {
+            if (tokenInput.value.trim().length > 0) {
+                save();
+            }
+        });
+
+        tokenInput.addEventListener("blur", () => {
+            if (tokenInput.value.trim().length > 0) {
+                save();
+            }
+        });
+
+        termsCheckbox.addEventListener("change", save);
+    })();
+</script>

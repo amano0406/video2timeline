@@ -1,0 +1,120 @@
+from __future__ import annotations
+
+from dataclasses import asdict, dataclass, field
+from typing import Any
+
+
+@dataclass
+class InputItem:
+    input_id: str
+    source_kind: str
+    source_id: str
+    original_path: str
+    display_name: str
+    size_bytes: int = 0
+    uploaded_path: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class JobRequest:
+    schema_version: int
+    job_id: str
+    created_at: str
+    output_root_id: str
+    output_root_path: str
+    profile: str
+    reprocess_duplicates: bool
+    token_enabled: bool
+    input_items: list[InputItem]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "job_id": self.job_id,
+            "created_at": self.created_at,
+            "output_root_id": self.output_root_id,
+            "output_root_path": self.output_root_path,
+            "profile": self.profile,
+            "reprocess_duplicates": self.reprocess_duplicates,
+            "token_enabled": self.token_enabled,
+            "input_items": [item.to_dict() for item in self.input_items],
+        }
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "JobRequest":
+        return cls(
+            schema_version=int(payload["schema_version"]),
+            job_id=str(payload["job_id"]),
+            created_at=str(payload["created_at"]),
+            output_root_id=str(payload["output_root_id"]),
+            output_root_path=str(payload["output_root_path"]),
+            profile=str(payload["profile"]),
+            reprocess_duplicates=bool(payload["reprocess_duplicates"]),
+            token_enabled=bool(payload.get("token_enabled", False)),
+            input_items=[InputItem(**item) for item in payload.get("input_items", [])],
+        )
+
+
+@dataclass
+class JobStatus:
+    schema_version: int = 1
+    job_id: str = ""
+    state: str = "pending"
+    current_stage: str = "queued"
+    message: str = ""
+    warnings: list[str] = field(default_factory=list)
+    videos_total: int = 0
+    videos_done: int = 0
+    videos_skipped: int = 0
+    videos_failed: int = 0
+    current_media: str | None = None
+    current_media_elapsed_sec: float = 0.0
+    processed_duration_sec: float = 0.0
+    total_duration_sec: float = 0.0
+    estimated_remaining_sec: float | None = None
+    started_at: str | None = None
+    updated_at: str | None = None
+    completed_at: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class JobResult:
+    schema_version: int = 1
+    job_id: str = ""
+    state: str = "pending"
+    run_dir: str = ""
+    output_root_id: str = ""
+    output_root_path: str = ""
+    processed_count: int = 0
+    skipped_count: int = 0
+    error_count: int = 0
+    batch_count: int = 0
+    timeline_index_path: str | None = None
+    warnings: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class ManifestItem:
+    input_id: str
+    source_kind: str
+    original_path: str
+    file_name: str
+    size_bytes: int
+    duration_seconds: float
+    sha256: str
+    duplicate_status: str
+    duplicate_of: str | None = None
+    media_id: str | None = None
+    status: str = "pending"
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
