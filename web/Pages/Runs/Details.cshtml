@@ -1,0 +1,258 @@
+@page "/runs/{id}"
+@model Video2Timeline.Web.Pages.Runs.DetailsModel
+@using System.Text.Json
+@inject Video2Timeline.Web.Services.LanguageService LanguageService
+@inject Video2Timeline.Web.Services.JsonLocalizationService Localizer
+@{
+    var run = Model.Run!;
+    var status = run.Status;
+    var result = run.Result;
+    var lang = LanguageService.Resolve(ViewContext.HttpContext.Request);
+    string L(string key) => Localizer.Get(lang, key);
+    string StateLabel(string? value)
+    {
+        var key = $"state.{(value ?? string.Empty).ToLowerInvariant()}";
+        var label = L(key);
+        return label == key ? value ?? "-" : label;
+    }
+
+    string StageLabel(string? value)
+    {
+        var key = $"stage.{(value ?? string.Empty).ToLowerInvariant()}";
+        var label = L(key);
+        return label == key ? value ?? "-" : label;
+    }
+
+    ViewData["Title"] = L("details.page_title");
+
+    var jsMessages = new
+    {
+        statePending = L("state.pending"),
+        stateRunning = L("state.running"),
+        stateCompleted = L("state.completed"),
+        stateFailed = L("state.failed"),
+        stateCanceled = L("state.canceled"),
+        stageQueued = L("stage.queued"),
+        stagePreflight = L("stage.preflight"),
+        stageExtractAudio = L("stage.extract_audio"),
+        stageTrimSilence = L("stage.trim_silence"),
+        stageTranscribe = L("stage.transcribe"),
+        stageScreens = L("stage.screens"),
+        stageScreenDiff = L("stage.screen_diff"),
+        stageOcrAndCaption = L("stage.ocr_and_caption"),
+        stageTimelineRender = L("stage.timeline_render"),
+        stageLlmExport = L("stage.llm_export"),
+        stageProcessing = L("stage.processing"),
+        unitSec = L("units.sec"),
+    };
+}
+
+<section class="app-page space-y-6" data-job-id="@run.JobId" id="run-details">
+    <div class="panel page-header">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div class="space-y-2">
+                <p class="eyebrow">@L("common.run")</p>
+                <h1 class="page-title">@run.JobId</h1>
+                <p class="page-description">@run.RunDirectory</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <a class="btn-secondary" href="/jobs">
+                    @L("layout.jobs")
+                </a>
+                @if (string.Equals(status?.State, "completed", StringComparison.OrdinalIgnoreCase))
+                {
+                    <a class="btn-secondary" href="/runs/@run.JobId/download">
+                        @L("details.download_zip")
+                    </a>
+                }
+            </div>
+        </div>
+    </div>
+
+    <section class="grid gap-4 lg:grid-cols-4">
+        <div class="metric-card">
+            <div class="metric-label">@L("common.state")</div>
+            <div class="metric-value"><span id="state">@StateLabel(status?.State)</span></div>
+            <div class="metric-subtle"><span id="stage">@StageLabel(status?.CurrentStage)</span></div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">@L("common.progress")</div>
+            <div class="metric-value"><span id="videos-done">@status?.VideosDone</span> / <span id="videos-total">@status?.VideosTotal</span></div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">@L("details.failed")</div>
+            <div class="metric-value" id="videos-failed">@status?.VideosFailed</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">@L("details.remaining_time")</div>
+            <div class="metric-value" id="eta">@((status?.EstimatedRemainingSec ?? 0).ToString("F0")) @L("units.sec")</div>
+        </div>
+    </section>
+
+    <section class="grid gap-8 xl:grid-cols-[1.1fr_0.9fr]">
+        <div class="space-y-8">
+            <div class="panel">
+                <h2 class="section-title">@L("details.current_processing")</h2>
+                <dl class="mt-4 grid gap-4 text-sm text-slate-700 md:grid-cols-2">
+                    <div>
+                        <dt class="text-slate-500">@L("details.current_file")</dt>
+                        <dd id="current-media">@status?.CurrentMedia</dd>
+                    </div>
+                    <div>
+                        <dt class="text-slate-500">@L("details.message")</dt>
+                        <dd id="message">@status?.Message</dd>
+                    </div>
+                    <div>
+                        <dt class="text-slate-500">@L("details.processed_duration")</dt>
+                        <dd id="processed-duration">@status?.ProcessedDurationSec</dd>
+                    </div>
+                    <div>
+                        <dt class="text-slate-500">@L("details.total_duration")</dt>
+                        <dd id="total-duration">@status?.TotalDurationSec</dd>
+                    </div>
+                </dl>
+            </div>
+
+            <div class="panel">
+                <div class="mb-4 flex items-center justify-between">
+                    <h2 class="section-title">@L("details.generated_timeline")</h2>
+                    @if (!string.IsNullOrWhiteSpace(result?.TimelineIndexPath))
+                    {
+                        <span class="badge-chip">@L("common.batch"): @result?.BatchCount</span>
+                    }
+                </div>
+                <div class="table-shell">
+                    <table class="app-table">
+                        <thead>
+                            <tr>
+                                <th class="px-4 py-3 font-medium">@L("common.media_id")</th>
+                                <th class="px-4 py-3 font-medium">@L("common.status")</th>
+                                <th class="px-4 py-3 font-medium">@L("details.source")</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @if (run.TimelineItems.Count == 0)
+                            {
+                                <tr>
+                                    <td colspan="3" class="px-4 py-8 text-center text-sm text-slate-500">@L("common.no_items")</td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var item in run.TimelineItems)
+                                {
+                                    <tr>
+                                        <td class="px-4 py-3 font-medium text-slate-900">
+                                            <a class="text-sky-700 hover:text-sky-500" href="/runs/@run.JobId/@item.MediaId">@item.MediaId</a>
+                                        </td>
+                                        <td class="px-4 py-3 text-slate-700">@StageLabel(item.Status)</td>
+                                        <td class="px-4 py-3 text-slate-600">@item.SourcePath</td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="space-y-8">
+            <div class="panel">
+                <h2 class="section-title">@L("details.result")</h2>
+                <dl class="mt-4 grid gap-4 text-sm text-slate-700">
+                    <div>
+                        <dt class="text-slate-500">@L("details.processed")</dt>
+                        <dd>@result?.ProcessedCount</dd>
+                    </div>
+                    <div>
+                        <dt class="text-slate-500">@L("details.skipped")</dt>
+                        <dd>@result?.SkippedCount</dd>
+                    </div>
+                    <div>
+                        <dt class="text-slate-500">@L("details.errors")</dt>
+                        <dd>@result?.ErrorCount</dd>
+                    </div>
+                    <div>
+                        <dt class="text-slate-500">@L("details.timeline_index")</dt>
+                        <dd class="break-all">@result?.TimelineIndexPath</dd>
+                    </div>
+                </dl>
+            </div>
+
+            <div class="panel timeline-shell">
+                <h2 class="section-title">@L("details.worker_log")</h2>
+                <pre class="mt-4 max-h-[28rem] text-xs">@run.LogTail</pre>
+            </div>
+        </div>
+    </section>
+</section>
+
+<script>
+    (() => {
+        const container = document.getElementById("run-details");
+        if (!container) return;
+
+        const messages = @Html.Raw(JsonSerializer.Serialize(jsMessages));
+        const jobId = container.dataset.jobId;
+
+        const stateLabel = (value) => {
+            switch ((value ?? "").toLowerCase()) {
+                case "pending": return messages.statePending;
+                case "running": return messages.stateRunning;
+                case "completed": return messages.stateCompleted;
+                case "failed": return messages.stateFailed;
+                case "canceled": return messages.stateCanceled;
+                default: return value ?? "";
+            }
+        };
+
+        const stageLabel = (value) => {
+            switch ((value ?? "").toLowerCase()) {
+                case "queued": return messages.stageQueued;
+                case "preflight": return messages.stagePreflight;
+                case "extract_audio": return messages.stageExtractAudio;
+                case "trim_silence": return messages.stageTrimSilence;
+                case "transcribe": return messages.stageTranscribe;
+                case "screens": return messages.stageScreens;
+                case "screen_diff": return messages.stageScreenDiff;
+                case "ocr_and_caption": return messages.stageOcrAndCaption;
+                case "timeline_render": return messages.stageTimelineRender;
+                case "llm_export": return messages.stageLlmExport;
+                case "processing": return messages.stageProcessing;
+                case "completed": return messages.stateCompleted;
+                case "failed": return messages.stateFailed;
+                default: return value ?? "";
+            }
+        };
+
+        const setText = (id, value) => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.textContent = value ?? "";
+            }
+        };
+
+        const update = async () => {
+            try {
+                const response = await fetch(`/api/jobs/${jobId}`);
+                if (!response.ok) return;
+                const liveStatus = await response.json();
+                setText("state", stateLabel(liveStatus.state));
+                setText("stage", stageLabel(liveStatus.current_stage));
+                setText("videos-done", liveStatus.videos_done);
+                setText("videos-total", liveStatus.videos_total);
+                setText("videos-failed", liveStatus.videos_failed);
+                setText("eta", `${Math.round(liveStatus.estimated_remaining_sec ?? 0)} ${messages.unitSec}`);
+                setText("current-media", liveStatus.current_media);
+                setText("message", liveStatus.message);
+                setText("processed-duration", liveStatus.processed_duration_sec);
+                setText("total-duration", liveStatus.total_duration_sec);
+            } catch {
+                // ignore local polling errors
+            }
+        };
+
+        update();
+        setInterval(update, 5000);
+    })();
+</script>
