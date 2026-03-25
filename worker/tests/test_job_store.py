@@ -4,10 +4,12 @@ import json
 import os
 import tempfile
 import unittest
+import zipfile
 from contextlib import contextmanager
 from pathlib import Path
 
 from video2timeline_worker.job_store import (
+    build_run_archive,
     collect_input_items,
     create_job,
     list_runs,
@@ -128,6 +130,54 @@ class JobStoreTests(unittest.TestCase):
                 self.assertTrue(snapshot["has_token"])
                 self.assertTrue(snapshot["terms_confirmed"])
                 self.assertTrue(snapshot["ready"])
+
+    def test_build_run_archive_creates_zip_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            runs_root = root / "runs"
+            settings = {
+                "videoExtensions": [".mp4"],
+                "inputRoots": [],
+                "outputRoots": [{"id": "runs", "path": str(runs_root), "enabled": True}],
+                "huggingfaceTermsConfirmed": False,
+            }
+
+            source_file = root / "sample.mp4"
+            source_file.write_bytes(b"sample")
+            items = collect_input_items(settings=settings, files=[source_file])
+            job_id, run_dir = create_job(settings=settings, input_items=items)
+            (run_dir / "result.json").write_text(
+                json.dumps({"job_id": job_id, "state": "completed"}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            media_dir = run_dir / "media" / "sample-12345678"
+            (media_dir / "timeline").mkdir(parents=True)
+            (media_dir / "timeline" / "timeline.md").write_text("# Timeline\n", encoding="utf-8")
+            (media_dir / "source.json").write_text(
+                json.dumps(
+                    {
+                        "display_name": "20260324_125832.mp4",
+                        "original_path": str(source_file),
+                        "captured_at": "2026-03-24T12:58:32+09:00",
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            (run_dir / "TRANSCRIPTION_INFO.md").write_text(
+                "# Transcription Info\n", encoding="utf-8"
+            )
+
+            archive_path = build_run_archive(job_id, settings=settings)
+
+            self.assertTrue(archive_path.exists())
+            self.assertEqual(".zip", archive_path.suffix)
+            with zipfile.ZipFile(archive_path) as archive:
+                names = set(archive.namelist())
+                self.assertIn("00_PACKAGE_INFO.md", names)
+                self.assertIn("00_TRANSCRIPTION_INFO.md", names)
+                self.assertIn("01_INDEX.md", names)
+                self.assertIn("01_2026-03-24 12-58-32.md", names)
 
 
 if __name__ == "__main__":

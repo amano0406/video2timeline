@@ -9,18 +9,6 @@
   ],
   "inputRoots": [
     {
-      "id": "primary",
-      "displayName": "Primary Videos",
-      "path": "/shared/inputs/primary",
-      "enabled": true
-    },
-    {
-      "id": "secondary",
-      "displayName": "Secondary Videos",
-      "path": "/shared/inputs/secondary",
-      "enabled": true
-    },
-    {
       "id": "uploads",
       "displayName": "Uploaded Files",
       "path": "/shared/uploads",
@@ -31,7 +19,7 @@
     {
       "id": "runs",
       "displayName": "Runs",
-      "path": "/shared/outputs/default",
+      "path": "/shared/outputs",
       "enabled": true
     }
   ]

@@ -4,12 +4,10 @@
 @using Video2Timeline.Web.Models
 @{
     var lang = LanguageService.Resolve(Context.Request);
-    var languages = LanguageService.GetSupportedLanguages();
     var setupState = Context.Items["SetupState"] as SetupState;
     var settingsReady = setupState?.IsReady ?? false;
     var appInstanceId = AppInstanceService.InstanceId;
     string L(string key) => Localizer.Get(lang, key);
-    var currentUrl = $"{Context.Request.Path}{Context.Request.QueryString}";
     var currentPath = Context.Request.Path.Value ?? "/";
 
     string NavClass(string href, bool includeRuns = false)
@@ -30,12 +28,6 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - video2timeline</title>
-    <script>
-        (() => {
-            const saved = localStorage.getItem("video2timeline-theme");
-            document.documentElement.dataset.appTheme = saved || "workbench";
-        })();
-    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
@@ -44,14 +36,9 @@
         <aside class="app-sidebar">
             <div class="space-y-6">
                 <div class="space-y-3">
-                    <div class="badge-chip">CPU-first</div>
                     <a href="/" class="block">
-                        <div class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Workspace</div>
-                        <div class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">video2timeline</div>
+                        <div class="text-2xl font-semibold tracking-tight text-slate-950">video2timeline</div>
                     </a>
-                    <p class="text-sm leading-6 text-slate-600">
-                        @L("layout.sidebar_description")
-                    </p>
                 </div>
 
                 <nav class="space-y-2">
@@ -68,30 +55,10 @@
                 <div class="status-pill @(settingsReady ? "status-pill-ready" : "status-pill-blocked")">
                     @(settingsReady ? L("layout.ready") : L("layout.setup_required"))
                 </div>
-                <form method="get" action="/set-language" class="space-y-2">
-                    <input type="hidden" name="returnUrl" value="@currentUrl" />
-                    <label for="lang-switch" class="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">@L("layout.language")</label>
-                    <select id="lang-switch"
-                            name="lang"
-                            class="form-input w-full"
-                            onchange="this.form.submit()">
-                        @foreach (var item in languages)
-                        {
-                            <option value="@item.Code" selected="@(item.Code == lang)">@item.NativeName</option>
-                        }
-                    </select>
-                </form>
             </div>
         </aside>
 
         <div class="app-content">
-            <header class="app-topbar">
-                <div>
-                    <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">video2timeline</div>
-                    <div class="text-lg font-semibold text-slate-950">@ViewData["Title"]</div>
-                </div>
-            </header>
-
             <main class="app-main">
                 @RenderBody()
             </main>

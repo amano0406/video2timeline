@@ -31,10 +31,25 @@ def probe_video(path: Path) -> dict[str, Any]:
     payload = json.loads(completed.stdout)
     duration = float(payload.get("format", {}).get("duration") or 0.0)
     size = int(payload.get("format", {}).get("size") or path.stat().st_size)
+    format_tags = payload.get("format", {}).get("tags") or {}
+    stream_tags = (
+        next(
+            (
+                stream.get("tags")
+                for stream in payload.get("streams", [])
+                if isinstance(stream.get("tags"), dict)
+                and stream.get("tags", {}).get("creation_time")
+            ),
+            {},
+        )
+        or {}
+    )
+    creation_time = format_tags.get("creation_time") or stream_tags.get("creation_time")
     return {
         "duration_seconds": duration,
         "size_bytes": size,
         "streams": payload.get("streams", []),
+        "captured_at": creation_time,
     }
 
 

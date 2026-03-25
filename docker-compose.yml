@@ -8,22 +8,17 @@ services:
       VIDEO2TIMELINE_RUNTIME_DEFAULTS: /app/config/runtime.defaults.json
       VIDEO2TIMELINE_APPDATA_ROOT: /shared/app-data
       VIDEO2TIMELINE_UPLOADS_ROOT: /shared/uploads
+      VIDEO2TIMELINE_OUTPUTS_ROOT: /shared/outputs
+      VIDEO2TIMELINE_HF_CACHE_ROOT: /cache/huggingface
+      VIDEO2TIMELINE_TORCH_CACHE_ROOT: /cache/torch
     ports:
       - "${VIDEO2TIMELINE_WEB_PORT}:8080"
     volumes:
-      - type: bind
-        source: ${VIDEO_SOURCE_1}
-        target: /shared/inputs/primary
-        read_only: true
-      - type: bind
-        source: ${VIDEO_SOURCE_2}
-        target: /shared/inputs/secondary
-        read_only: true
-      - type: bind
-        source: ${VIDEO_OUTPUT_ROOT}
-        target: /shared/outputs
       - app-data:/shared/app-data
+      - outputs:/shared/outputs
       - uploads:/shared/uploads
+      - hf-cache:/cache/huggingface
+      - torch-cache:/cache/torch
     depends_on:
       - worker
 
@@ -35,28 +30,20 @@ services:
       VIDEO2TIMELINE_RUNTIME_DEFAULTS: /app/config/runtime.defaults.json
       VIDEO2TIMELINE_APPDATA_ROOT: /shared/app-data
       VIDEO2TIMELINE_UPLOADS_ROOT: /shared/uploads
+      VIDEO2TIMELINE_OUTPUTS_ROOT: /shared/outputs
       HF_HOME: /cache/huggingface
       TRANSFORMERS_CACHE: /cache/huggingface
       TORCH_HOME: /cache/torch
     volumes:
-      - type: bind
-        source: ${VIDEO_SOURCE_1}
-        target: /shared/inputs/primary
-        read_only: true
-      - type: bind
-        source: ${VIDEO_SOURCE_2}
-        target: /shared/inputs/secondary
-        read_only: true
-      - type: bind
-        source: ${VIDEO_OUTPUT_ROOT}
-        target: /shared/outputs
       - app-data:/shared/app-data
+      - outputs:/shared/outputs
       - uploads:/shared/uploads
       - hf-cache:/cache/huggingface
       - torch-cache:/cache/torch
 
 volumes:
   app-data:
+  outputs:
   uploads:
   hf-cache:
   torch-cache:

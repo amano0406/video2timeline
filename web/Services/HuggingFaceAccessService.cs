@@ -4,9 +4,22 @@ using Video2Timeline.Web.Models;
 
 namespace Video2Timeline.Web.Services;
 
-public sealed class HuggingFaceAccessService(HttpClient httpClient, SettingsStore settingsStore, IConfiguration configuration)
+public sealed class HuggingFaceAccessService(
+    HttpClient httpClient,
+    SettingsStore settingsStore,
+    IConfiguration configuration)
 {
-    private const string PyannoteResolveUrl = "https://huggingface.co/pyannote/speaker-diarization-community-1/resolve/main/config.yaml";
+    private const string PyannoteModelId = "pyannote/speaker-diarization-community-1";
+    private const string PyannoteDisplayName = "pyannote speaker diarization";
+    private const string PyannotePurpose = "Speaker diarization";
+    private const string PyannoteApprovalUrl = "https://huggingface.co/pyannote/speaker-diarization-community-1";
+    private const string PyannoteResolveUrl =
+        "https://huggingface.co/pyannote/speaker-diarization-community-1/resolve/main/config.yaml";
+    private const string WhisperxModelId = "whisperx-medium";
+    private const string EasyOcrModelId = "easyocr";
+    private const string FlorenceModelId = "florence-2-base";
+    private const string TesseractModelId = "tesseract-ocr";
+
     private readonly string? _overrideState = configuration["VIDEO2TIMELINE_HF_ACCESS_OVERRIDE"];
 
     public async Task<HuggingFaceAccessSnapshot> GetSnapshotAsync(CancellationToken cancellationToken = default)
@@ -17,66 +30,97 @@ public sealed class HuggingFaceAccessService(HttpClient httpClient, SettingsStor
         {
             HasToken = hasToken,
             TermsConfirmed = settings.HuggingfaceTermsConfirmed,
+            Models =
+            [
+                new GatedModelStatusItem
+                {
+                    ModelId = PyannoteModelId,
+                    DisplayName = PyannoteDisplayName,
+                    Purpose = PyannotePurpose,
+                    ApprovalUrl = PyannoteApprovalUrl,
+                    RequiresApproval = true,
+                    TokenConfigured = hasToken,
+                    TermsConfirmed = settings.HuggingfaceTermsConfirmed,
+                },
+                CreateUngatedModel(WhisperxModelId, "WhisperX medium", "Speech transcription"),
+                CreateUngatedModel(EasyOcrModelId, "EasyOCR", "Screen text OCR"),
+                CreateUngatedModel(FlorenceModelId, "Florence-2 base", "Screen description"),
+                CreateUngatedModel(TesseractModelId, "Tesseract OCR", "OCR fallback"),
+            ],
         };
 
         if (!string.IsNullOrWhiteSpace(_overrideState))
         {
-            snapshot.AccessState = _overrideState.Trim().ToLowerInvariant();
-            snapshot.AccessMessage = snapshot.AccessState;
-            return snapshot;
+            return ApplyState(snapshot, _overrideState.Trim().ToLowerInvariant(), _overrideState);
         }
 
         if (!hasToken)
         {
-            snapshot.AccessState = "token_missing";
-            snapshot.AccessMessage = "Token が未設定です。";
-            return snapshot;
-        }
-
-        if (!settings.HuggingfaceTermsConfirmed)
-        {
-            snapshot.AccessState = "consent_pending";
-            snapshot.AccessMessage = "モデル利用条件の確認が未完了です。";
-            return snapshot;
+            return ApplyState(snapshot, "token_missing", "Token is not configured.");
         }
 
         var token = await settingsStore.ReadTokenAsync(cancellationToken);
         if (string.IsNullOrWhiteSpace(token))
         {
-            snapshot.AccessState = "token_missing";
-            snapshot.AccessMessage = "Token が未設定です。";
-            return snapshot;
+            return ApplyState(snapshot, "token_missing", "Token is not configured.");
         }
 
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, PyannoteResolveUrl);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            using var response = await httpClient.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {
-                snapshot.AccessState = "authorized";
-                snapshot.AccessMessage = "pyannote モデルへのアクセスは利用可能です。";
-                return snapshot;
+                return ApplyState(snapshot, "authorized", "Model access is available.");
             }
 
             if (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized)
             {
-                snapshot.AccessState = "unauthorized";
-                snapshot.AccessMessage = "token は保存済みですが、モデル承認がまだ反映されていません。";
-                return snapshot;
+                return ApplyState(snapshot, "unauthorized", "Token is saved, but model approval is not available yet.");
             }
 
-            snapshot.AccessState = "unknown";
-            snapshot.AccessMessage = $"承認状態を確認できませんでした。HTTP {(int)response.StatusCode}";
-            return snapshot;
+            return ApplyState(snapshot, "unknown", $"Unexpected HTTP {(int)response.StatusCode}.");
         }
         catch (Exception ex)
         {
-            snapshot.AccessState = "unknown";
-            snapshot.AccessMessage = $"承認状態の確認に失敗しました: {ex.Message}";
-            return snapshot;
+            return ApplyState(snapshot, "unknown", ex.Message);
         }
     }
+
+    private static HuggingFaceAccessSnapshot ApplyState(
+        HuggingFaceAccessSnapshot snapshot,
+        string state,
+        string message)
+    {
+        snapshot.AccessState = state;
+        snapshot.AccessMessage = message;
+
+        foreach (var model in snapshot.Models)
+        {
+            if (model.RequiresApproval)
+            {
+                model.AccessState = state;
+            }
+        }
+
+        return snapshot;
+    }
+
+    private static GatedModelStatusItem CreateUngatedModel(string modelId, string displayName, string purpose) =>
+        new()
+        {
+            ModelId = modelId,
+            DisplayName = displayName,
+            Purpose = purpose,
+            ApprovalUrl = string.Empty,
+            RequiresApproval = false,
+            TokenConfigured = false,
+            TermsConfirmed = true,
+            AccessState = "available",
+        };
 }

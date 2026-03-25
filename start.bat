@@ -22,26 +22,11 @@ if not exist ".env" (
   echo Created .env from .env.example.
 )
 
-set "VIDEO_SOURCE_1="
-set "VIDEO_SOURCE_2="
-set "VIDEO_OUTPUT_ROOT="
 set "WEB_PORT=38090"
 
 for /f "usebackq tokens=1,* delims==" %%A in (".env") do (
-  if /I "%%A"=="VIDEO_SOURCE_1" set "VIDEO_SOURCE_1=%%B"
-  if /I "%%A"=="VIDEO_SOURCE_2" set "VIDEO_SOURCE_2=%%B"
-  if /I "%%A"=="VIDEO_OUTPUT_ROOT" set "VIDEO_OUTPUT_ROOT=%%B"
   if /I "%%A"=="VIDEO2TIMELINE_WEB_PORT" set "WEB_PORT=%%B"
 )
-
-call :validate_input_path "VIDEO_SOURCE_1" "!VIDEO_SOURCE_1!"
-if errorlevel 1 exit /b 1
-
-call :validate_input_path "VIDEO_SOURCE_2" "!VIDEO_SOURCE_2!"
-if errorlevel 1 exit /b 1
-
-call :validate_output_path "VIDEO_OUTPUT_ROOT" "!VIDEO_OUTPUT_ROOT!"
-if errorlevel 1 exit /b 1
 
 echo Starting web and worker containers...
 set "COMPOSE_GPU_FILE="
@@ -92,53 +77,3 @@ echo.
 echo Last container logs:
 docker compose logs --tail 40 web worker
 exit /b 1
-
-:validate_input_path
-set "VAR_NAME=%~1"
-set "VAR_VALUE=%~2"
-
-if not defined VAR_VALUE (
-  echo %VAR_NAME% is not set in .env.
-  exit /b 1
-)
-
-echo %VAR_VALUE% | findstr /I /C:":\path\to\" /C:"/path/to/" >nul
-if not errorlevel 1 (
-  echo %VAR_NAME% still uses the placeholder value in .env.
-  echo Edit .env and set it to a real directory before starting.
-  exit /b 1
-)
-
-if not exist "%VAR_VALUE%" (
-  echo %VAR_NAME% does not exist: %VAR_VALUE%
-  exit /b 1
-)
-
-exit /b 0
-
-:validate_output_path
-set "VAR_NAME=%~1"
-set "VAR_VALUE=%~2"
-
-if not defined VAR_VALUE (
-  echo %VAR_NAME% is not set in .env.
-  exit /b 1
-)
-
-echo %VAR_VALUE% | findstr /I /C:":\path\to\" /C:"/path/to/" >nul
-if not errorlevel 1 (
-  echo %VAR_NAME% still uses the placeholder value in .env.
-  echo Edit .env and set it to a real directory before starting.
-  exit /b 1
-)
-
-if not exist "%VAR_VALUE%" (
-  echo Creating output directory: %VAR_VALUE%
-  mkdir "%VAR_VALUE%" >nul 2>&1
-  if errorlevel 1 (
-    echo Failed to create output directory: %VAR_VALUE%
-    exit /b 1
-  )
-)
-
-exit /b 0

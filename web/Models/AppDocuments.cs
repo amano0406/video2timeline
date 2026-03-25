@@ -36,6 +36,9 @@ public sealed class AppSettingsDocument
 
     [JsonPropertyName("computeMode")]
     public string ComputeMode { get; set; } = "cpu";
+
+    [JsonPropertyName("uiLanguage")]
+    public string UiLanguage { get; set; } = "en";
 }
 
 public sealed class UploadedFileReference
@@ -162,6 +165,72 @@ public sealed class HuggingFaceAccessSnapshot
 
     [JsonPropertyName("accessMessage")]
     public string AccessMessage { get; set; } = "";
+
+    [JsonPropertyName("models")]
+    public List<GatedModelStatusItem> Models { get; set; } = [];
+}
+
+public sealed class GatedModelStatusItem
+{
+    [JsonPropertyName("modelId")]
+    public string ModelId { get; set; } = "";
+
+    [JsonPropertyName("displayName")]
+    public string DisplayName { get; set; } = "";
+
+    [JsonPropertyName("purpose")]
+    public string Purpose { get; set; } = "";
+
+    [JsonPropertyName("approvalUrl")]
+    public string ApprovalUrl { get; set; } = "";
+
+    [JsonPropertyName("requiresApproval")]
+    public bool RequiresApproval { get; set; }
+
+    [JsonPropertyName("tokenConfigured")]
+    public bool TokenConfigured { get; set; }
+
+    [JsonPropertyName("termsConfirmed")]
+    public bool TermsConfirmed { get; set; }
+
+    [JsonPropertyName("accessState")]
+    public string AccessState { get; set; } = "unknown";
+}
+
+public sealed class WorkerCapabilitySnapshot
+{
+    [JsonPropertyName("generatedAt")]
+    public string? GeneratedAt { get; set; }
+
+    [JsonPropertyName("torchInstalled")]
+    public bool TorchInstalled { get; set; }
+
+    [JsonPropertyName("torchCudaBuilt")]
+    public bool TorchCudaBuilt { get; set; }
+
+    [JsonPropertyName("gpuAvailable")]
+    public bool GpuAvailable { get; set; }
+
+    [JsonPropertyName("deviceCount")]
+    public int DeviceCount { get; set; }
+
+    [JsonPropertyName("deviceNames")]
+    public List<string> DeviceNames { get; set; } = [];
+
+    [JsonPropertyName("message")]
+    public string Message { get; set; } = "";
+}
+
+public sealed class ModelCacheSnapshot
+{
+    [JsonPropertyName("hasCache")]
+    public bool HasCache { get; set; }
+
+    [JsonPropertyName("totalBytes")]
+    public long TotalBytes { get; set; }
+
+    [JsonPropertyName("directoryCount")]
+    public int DirectoryCount { get; set; }
 }
 
 public sealed class SetupState
@@ -283,6 +352,9 @@ public sealed class JobStatusDocument
     [JsonPropertyName("estimated_remaining_sec")]
     public double? EstimatedRemainingSec { get; set; }
 
+    [JsonPropertyName("progress_percent")]
+    public double ProgressPercent { get; set; }
+
     [JsonPropertyName("started_at")]
     public string? StartedAt { get; set; }
 
@@ -396,6 +468,7 @@ public sealed class RunSummary
     public int VideosFailed { get; set; }
     public long TotalSizeBytes { get; set; }
     public double TotalDurationSec { get; set; }
+    public double ProgressPercent { get; set; }
     public string? UpdatedAt { get; set; }
     public string? CreatedAt { get; set; }
 }

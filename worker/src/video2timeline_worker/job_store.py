@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import re
+import shutil
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -8,8 +11,17 @@ from uuid import uuid4
 
 from .contracts import InputItem, JobRequest, JobResult, JobStatus
 from .discovery import discover_videos
-from .fs_utils import ensure_dir, now_iso, write_text
+from .fs_utils import ensure_dir, now_iso, slugify, write_text
 from .settings import load_huggingface_token, load_settings
+
+_DATETIME_PATTERNS = [
+    re.compile(
+        r"(?P<year>20\d{2})[-_ ]?(?P<month>\d{2})[-_ ]?(?P<day>\d{2})[T _-]?(?P<hour>\d{2})[-_ ]?(?P<minute>\d{2})[-_ ]?(?P<second>\d{2})"
+    ),
+    re.compile(
+        r"(?P<year>20\d{2})(?P<month>\d{2})(?P<day>\d{2})[-_ ]?(?P<hour>\d{2})(?P<minute>\d{2})(?P<second>\d{2})"
+    ),
+]
 
 
 def _allowed_extensions(settings: dict[str, Any]) -> set[str]:
@@ -193,6 +205,137 @@ def find_run_dir(job_id: str, settings: dict[str, Any] | None = None) -> Path:
         if candidate.exists():
             return candidate
     raise ValueError(f"Run not found: {job_id}")
+
+
+def build_run_archive(
+    job_id: str,
+    *,
+    settings: dict[str, Any] | None = None,
+    output: Path | None = None,
+) -> Path:
+    run_dir = find_run_dir(job_id, settings)
+    archive_base = (output if output is not None else run_dir.parent / job_id).resolve()
+    archive_base.parent.mkdir(parents=True, exist_ok=True)
+    archive_path = archive_base.with_suffix(".zip")
+    if archive_path.exists():
+        archive_path.unlink()
+
+    staging_root = Path(tempfile.mkdtemp(prefix=f"{job_id}-export-", dir=str(archive_base.parent)))
+    try:
+        _build_export_package(run_dir, job_id, staging_root)
+        created = shutil.make_archive(str(archive_base), "zip", root_dir=str(staging_root))
+        return Path(created)
+    finally:
+        shutil.rmtree(staging_root, ignore_errors=True)
+
+
+def _build_export_package(run_dir: Path, job_id: str, export_root: Path) -> None:
+    timelines: list[dict[str, str]] = []
+    media_root = run_dir / "media"
+    if media_root.exists():
+        for media_dir in sorted(media_root.iterdir()):
+            if not media_dir.is_dir():
+                continue
+            timeline_path = media_dir / "timeline" / "timeline.md"
+            if not timeline_path.exists():
+                continue
+            source_path = media_dir / "source.json"
+            source_info = (
+                json.loads(source_path.read_text(encoding="utf-8-sig", errors="replace"))
+                if source_path.exists()
+                else {}
+            )
+            label = _best_export_label(media_dir.name, source_info)
+            timelines.append(
+                {
+                    "media_id": media_dir.name,
+                    "timeline_path": str(timeline_path),
+                    "label": label,
+                    "source_path": str(source_info.get("original_path") or ""),
+                }
+            )
+
+    timelines.sort(key=lambda row: (row["label"], row["media_id"]))
+
+    transcription_info_path = run_dir / "TRANSCRIPTION_INFO.md"
+    if transcription_info_path.exists():
+        shutil.copy2(transcription_info_path, export_root / "00_TRANSCRIPTION_INFO.md")
+
+    package_note = "\n".join(
+        [
+            "# Export Package",
+            "",
+            f"- Job ID: `{job_id}`",
+            "- Open the numbered `.md` files.",
+            "- Each file is the timeline for one video.",
+            "- This ZIP is reduced for LLM upload and review.",
+            "",
+        ]
+    )
+    (export_root / "00_PACKAGE_INFO.md").write_text(package_note, encoding="utf-8")
+
+    index_lines = ["# Files", ""]
+    for index, row in enumerate(timelines, start=1):
+        file_name = f"{index:02d}_{row['label']}.md"
+        destination = export_root / file_name
+        destination.write_text(
+            Path(row["timeline_path"]).read_text(encoding="utf-8", errors="replace"),
+            encoding="utf-8",
+        )
+        index_lines.append(f"- `{file_name}`")
+        if row["source_path"]:
+            index_lines.append(f"  - Source: `{row['source_path']}`")
+    (export_root / "01_INDEX.md").write_text(
+        "\n".join(index_lines).rstrip() + "\n", encoding="utf-8"
+    )
+
+
+def _best_export_label(media_id: str, source_info: dict[str, Any]) -> str:
+    candidates = [
+        str(source_info.get("captured_at") or "").strip(),
+        str(source_info.get("display_name") or "").strip(),
+        str(source_info.get("original_path") or "").strip(),
+        media_id,
+    ]
+    for candidate in candidates:
+        parsed = _parse_best_effort_datetime(candidate)
+        if parsed is not None:
+            return parsed.strftime("%Y-%m-%d %H-%M-%S")
+
+    fallback = Path(
+        str(source_info.get("resolved_path") or source_info.get("original_path") or media_id)
+    )
+    if fallback.exists():
+        return datetime.fromtimestamp(fallback.stat().st_mtime).strftime("%Y-%m-%d %H-%M-%S")
+
+    return slugify(media_id)
+
+
+def _parse_best_effort_datetime(value: str) -> datetime | None:
+    if not value:
+        return None
+    normalized = value.replace("Z", "+00:00")
+    try:
+        return datetime.fromisoformat(normalized)
+    except ValueError:
+        pass
+    for pattern in _DATETIME_PATTERNS:
+        match = pattern.search(value)
+        if not match:
+            continue
+        parts = {key: int(text) for key, text in match.groupdict().items()}
+        try:
+            return datetime(
+                parts["year"],
+                parts["month"],
+                parts["day"],
+                parts["hour"],
+                parts["minute"],
+                parts["second"],
+            )
+        except ValueError:
+            return None
+    return None
 
 
 def create_job(

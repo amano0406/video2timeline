@@ -7,7 +7,9 @@ from pathlib import Path
 
 from .config import AppConfig, ChangeDetectionConfig, OcrPolicy, SourceDirectory, load_config
 from .discovery import discover_videos
+from .fs_utils import now_iso
 from .job_store import (
+    build_run_archive,
     collect_input_items,
     create_job,
     find_run_dir,
@@ -21,6 +23,7 @@ from .settings import (
     load_settings,
     save_huggingface_token,
     save_settings,
+    save_worker_capabilities,
 )
 
 
@@ -63,6 +66,12 @@ def parse_args() -> argparse.Namespace:
     jobs_run = jobs_subparsers.add_parser("run", help="Run one existing queued job.")
     jobs_run.add_argument("--job-id", type=str, required=True)
     jobs_run.add_argument("--json", action="store_true")
+    jobs_archive = jobs_subparsers.add_parser(
+        "archive", help="Create a ZIP archive for one completed job."
+    )
+    jobs_archive.add_argument("--job-id", type=str, required=True)
+    jobs_archive.add_argument("--output", type=Path, required=False)
+    jobs_archive.add_argument("--json", action="store_true")
 
     scan_parser = subparsers.add_parser(
         "scan", help="Scan configured source directories for videos."
@@ -146,11 +155,45 @@ def cmd_run_job(job_dir: Path) -> int:
 def cmd_daemon(poll_interval: int) -> int:
     from .processor import process_job
 
+    _write_worker_capabilities()
     while True:
         found = process_job()
         if not found:
             time.sleep(max(1, poll_interval))
     return 0
+
+
+def _write_worker_capabilities() -> None:
+    payload: dict[str, object] = {
+        "generatedAt": now_iso(),
+        "torchInstalled": False,
+        "torchCudaBuilt": False,
+        "gpuAvailable": False,
+        "deviceCount": 0,
+        "deviceNames": [],
+        "message": "Worker capability report created.",
+    }
+    try:
+        import torch
+
+        payload["torchInstalled"] = True
+        payload["torchCudaBuilt"] = bool(torch.backends.cuda.is_built())
+        payload["gpuAvailable"] = bool(torch.cuda.is_available())
+        payload["deviceCount"] = int(torch.cuda.device_count()) if torch.cuda.is_available() else 0
+        payload["deviceNames"] = (
+            [torch.cuda.get_device_name(index) for index in range(torch.cuda.device_count())]
+            if torch.cuda.is_available()
+            else []
+        )
+        payload["message"] = (
+            "GPU is available to the worker."
+            if payload["gpuAvailable"]
+            else "GPU is not available to the worker."
+        )
+    except Exception as exc:
+        payload["message"] = f"Capability check failed: {exc}"
+
+    save_worker_capabilities(payload)
 
 
 def _print_payload(payload: dict[str, object] | list[dict[str, object]], as_json: bool) -> None:
@@ -289,6 +332,16 @@ def cmd_jobs_run(job_id: str, as_json: bool) -> int:
     return 0
 
 
+def cmd_jobs_archive(job_id: str, output: Path | None, as_json: bool) -> int:
+    archive_path = build_run_archive(job_id, output=output)
+    payload = {
+        "job_id": job_id,
+        "archive_path": str(archive_path),
+    }
+    _print_payload(payload, as_json)
+    return 0
+
+
 def main() -> int:
     args = parse_args()
     if args.command == "settings":
@@ -314,6 +367,8 @@ def main() -> int:
             )
         if args.jobs_command == "run":
             return cmd_jobs_run(args.job_id, args.json)
+        if args.jobs_command == "archive":
+            return cmd_jobs_archive(args.job_id, args.output, args.json)
     if args.command == "scan":
         return cmd_scan(args.config, args.output)
     if args.command == "compare-images":

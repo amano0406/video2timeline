@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import threading
 import traceback
 from pathlib import Path
 from time import monotonic
@@ -26,6 +27,14 @@ from .screens import extract_screens
 from .settings import load_settings
 from .timeline import render_timeline
 from .transcribe import transcribe_audio
+
+_ITEM_STAGE_BOUNDS: dict[str, tuple[float, float]] = {
+    "extract_audio": (0.0, 0.12),
+    "trim_silence": (0.12, 0.24),
+    "transcribe": (0.24, 0.78),
+    "screen_extract": (0.78, 0.94),
+    "timeline_render": (0.94, 1.0),
+}
 
 
 def _job_log_path(job_dir: Path) -> Path:
@@ -87,6 +96,106 @@ def _estimate_remaining(
     if rate <= 0:
         return None
     return max(0.0, (total_duration_sec - processed_duration_sec) / rate)
+
+
+def _stage_expected_seconds(stage_name: str, media_duration_sec: float, compute_mode: str) -> float:
+    safe_duration = max(1.0, media_duration_sec)
+    if stage_name == "extract_audio":
+        return max(1.5, min(20.0, safe_duration * 0.05))
+    if stage_name == "trim_silence":
+        return max(1.5, min(30.0, safe_duration * 0.08))
+    if stage_name == "transcribe":
+        factor = 0.25 if compute_mode == "gpu" else 1.20
+        ceiling = 180.0 if compute_mode == "gpu" else 900.0
+        return max(4.0, min(ceiling, safe_duration * factor))
+    if stage_name == "screen_extract":
+        return max(2.0, min(90.0, safe_duration * 0.10))
+    if stage_name == "timeline_render":
+        return max(1.0, min(15.0, safe_duration * 0.03))
+    if stage_name == "llm_export":
+        return 5.0
+    if stage_name == "preflight":
+        return max(1.0, min(10.0, safe_duration * 0.02))
+    return 5.0
+
+
+def _current_item_stage_fraction(
+    stage_name: str, elapsed_sec: float, media_duration_sec: float, compute_mode: str
+) -> float:
+    lower, upper = _ITEM_STAGE_BOUNDS.get(stage_name, (0.0, 1.0))
+    if upper <= lower:
+        return upper
+    expected = _stage_expected_seconds(stage_name, media_duration_sec, compute_mode)
+    stage_progress = min(1.0, max(0.0, elapsed_sec / max(expected, 0.1)))
+    return lower + ((upper - lower) * stage_progress)
+
+
+def _overall_progress_percent(
+    *,
+    processed_duration_sec: float,
+    total_duration_sec: float,
+    current_stage: str,
+    current_stage_elapsed_sec: float,
+    current_media_duration_sec: float,
+    compute_mode: str,
+    preflight_fraction: float = 1.0,
+    total_items: int = 0,
+    completed_items: int = 0,
+) -> float:
+    if current_stage == "queued":
+        return 0.0
+    if current_stage == "preflight":
+        return round(5.0 * min(1.0, max(0.0, preflight_fraction)), 1)
+    if current_stage == "llm_export":
+        export_fraction = min(
+            1.0,
+            max(
+                0.0,
+                current_stage_elapsed_sec
+                / _stage_expected_seconds("llm_export", 1.0, compute_mode),
+            ),
+        )
+        return round(95.0 + (4.0 * export_fraction), 1)
+    if current_stage == "completed":
+        return 100.0
+    if total_duration_sec > 0:
+        current_item_fraction = _current_item_stage_fraction(
+            current_stage, current_stage_elapsed_sec, current_media_duration_sec, compute_mode
+        )
+        effective_processed = min(
+            total_duration_sec,
+            max(0.0, processed_duration_sec)
+            + (max(0.0, current_media_duration_sec) * current_item_fraction),
+        )
+        duration_fraction = effective_processed / total_duration_sec
+        return round(5.0 + (90.0 * duration_fraction), 1)
+
+    if total_items <= 0:
+        return 0.0
+
+    current_item_fraction = _current_item_stage_fraction(
+        current_stage, current_stage_elapsed_sec, current_media_duration_sec, compute_mode
+    )
+    completed_fraction = min(1.0, max(0.0, (completed_items + current_item_fraction) / total_items))
+    return round(5.0 + (90.0 * completed_fraction), 1)
+
+
+def _completed_progress_percent(
+    *,
+    processed_duration_sec: float,
+    total_duration_sec: float,
+    total_items: int,
+    completed_items: int,
+) -> float:
+    if total_duration_sec > 0:
+        completed_fraction = min(1.0, max(0.0, processed_duration_sec / total_duration_sec))
+        return round(5.0 + (90.0 * completed_fraction), 1)
+
+    if total_items <= 0:
+        return 0.0
+
+    completed_fraction = min(1.0, max(0.0, completed_items / total_items))
+    return round(5.0 + (90.0 * completed_fraction), 1)
 
 
 def _write_support_docs(job_dir: Path, request: JobRequest) -> None:
@@ -250,6 +359,7 @@ def _process_one_item(
         "size_bytes": manifest_item.size_bytes,
         "duration_seconds": manifest_item.duration_seconds,
         "sha256": manifest_item.sha256,
+        "captured_at": manifest_item.__dict__.get("captured_at"),
     }
     write_json_atomic(media_dir / "source.json", source_info)
 
@@ -311,6 +421,7 @@ def process_job(job_dir: Path | None = None) -> bool:
     status.state = "running"
     status.current_stage = "preflight"
     status.message = "Preparing job."
+    status.progress_percent = max(status.progress_percent, 1.0)
     status.started_at = status.started_at or now_iso()
     _write_status(job_dir, status)
 
@@ -325,6 +436,7 @@ def process_job(job_dir: Path | None = None) -> bool:
 
     started = monotonic()
     warnings: list[str] = []
+    compute_mode = str(load_settings().get("computeMode") or "cpu").lower()
     catalog = load_catalog(Path(request.output_root_path))
     manifest_items: list[ManifestItem] = []
     appended_catalog_rows: list[dict[str, Any]] = []
@@ -335,6 +447,16 @@ def process_job(job_dir: Path | None = None) -> bool:
             status.current_media = input_item.display_name
             status.message = (
                 f"Preflight {index}/{len(request.input_items)}: {input_item.display_name}"
+            )
+            status.progress_percent = _overall_progress_percent(
+                processed_duration_sec=0.0,
+                total_duration_sec=0.0,
+                current_stage="preflight",
+                current_stage_elapsed_sec=0.0,
+                current_media_duration_sec=0.0,
+                compute_mode=compute_mode,
+                preflight_fraction=index / max(len(request.input_items), 1),
+                total_items=max(len(request.input_items), 1),
             )
             _write_status(job_dir, status)
             source_path = _resolve_input_path(input_item)
@@ -375,6 +497,7 @@ def process_job(job_dir: Path | None = None) -> bool:
         status.total_duration_sec = round(total_duration, 3)
         status.current_media = None
         status.message = "Preflight completed."
+        status.progress_percent = 5.0 if manifest_items else 0.0
         _write_manifest(job_dir, request.job_id, manifest_items)
         _write_status(job_dir, status)
         append_log(log_path, f"[{now_iso()}] Preflight complete for {len(manifest_items)} item(s).")
@@ -386,16 +509,91 @@ def process_job(job_dir: Path | None = None) -> bool:
         ):
             status.current_media = input_item.display_name
             status.current_media_elapsed_sec = 0.0
-            status.current_stage = "processing"
+            status.current_stage = "extract_audio"
             status.message = f"Processing {index}/{len(manifest_items)}: {input_item.display_name}"
+            status.progress_percent = _overall_progress_percent(
+                processed_duration_sec=status.processed_duration_sec,
+                total_duration_sec=status.total_duration_sec,
+                current_stage="extract_audio",
+                current_stage_elapsed_sec=0.0,
+                current_media_duration_sec=manifest_item.duration_seconds,
+                compute_mode=compute_mode,
+                total_items=max(len(manifest_items), 1),
+                completed_items=status.videos_done + status.videos_skipped + status.videos_failed,
+            )
             _write_status(job_dir, status)
             item_started = monotonic()
+            heartbeat_state = {
+                "stage_name": "extract_audio",
+                "media_duration_sec": max(1.0, manifest_item.duration_seconds),
+            }
+            heartbeat_stop = threading.Event()
+            heartbeat_lock = threading.Lock()
+
+            def heartbeat() -> None:
+                while not heartbeat_stop.wait(2.0):
+                    with heartbeat_lock:
+                        stage_name = str(heartbeat_state["stage_name"])
+                    elapsed = monotonic() - item_started
+                    completed_count = (
+                        status.videos_done + status.videos_skipped + status.videos_failed
+                    )
+                    current_fraction = _current_item_stage_fraction(
+                        stage_name,
+                        elapsed,
+                        manifest_item.duration_seconds,
+                        compute_mode,
+                    )
+                    effective_processed = status.processed_duration_sec + (
+                        manifest_item.duration_seconds * current_fraction
+                    )
+                    status.current_media_elapsed_sec = round(elapsed, 3)
+                    status.progress_percent = max(
+                        status.progress_percent,
+                        _overall_progress_percent(
+                            processed_duration_sec=status.processed_duration_sec,
+                            total_duration_sec=status.total_duration_sec,
+                            current_stage=stage_name,
+                            current_stage_elapsed_sec=elapsed,
+                            current_media_duration_sec=manifest_item.duration_seconds,
+                            compute_mode=compute_mode,
+                            total_items=max(len(manifest_items), 1),
+                            completed_items=completed_count,
+                        ),
+                    )
+                    status.estimated_remaining_sec = _estimate_remaining(
+                        status.total_duration_sec,
+                        effective_processed,
+                        monotonic() - started,
+                    )
+                    _write_status(job_dir, status)
+
+            heartbeat_thread = threading.Thread(target=heartbeat, daemon=True)
+            heartbeat_thread.start()
 
             def stage_update(stage_name: str, message: str) -> None:
+                with heartbeat_lock:
+                    heartbeat_state["stage_name"] = stage_name
+                elapsed = monotonic() - item_started
                 status.current_stage = stage_name
                 status.message = message
                 status.current_media = input_item.display_name
-                status.current_media_elapsed_sec = round(monotonic() - item_started, 3)
+                status.current_media_elapsed_sec = round(elapsed, 3)
+                status.progress_percent = max(
+                    status.progress_percent,
+                    _overall_progress_percent(
+                        processed_duration_sec=status.processed_duration_sec,
+                        total_duration_sec=status.total_duration_sec,
+                        current_stage=stage_name,
+                        current_stage_elapsed_sec=elapsed,
+                        current_media_duration_sec=manifest_item.duration_seconds,
+                        compute_mode=compute_mode,
+                        total_items=max(len(manifest_items), 1),
+                        completed_items=status.videos_done
+                        + status.videos_skipped
+                        + status.videos_failed,
+                    ),
+                )
                 _write_status(job_dir, status)
                 append_log(log_path, f"[{now_iso()}] {stage_name}: {input_item.original_path}")
 
@@ -404,6 +602,14 @@ def process_job(job_dir: Path | None = None) -> bool:
                 status.videos_skipped += 1
                 status.processed_duration_sec = round(
                     status.processed_duration_sec + manifest_item.duration_seconds, 3
+                )
+                status.progress_percent = _completed_progress_percent(
+                    processed_duration_sec=status.processed_duration_sec,
+                    total_duration_sec=status.total_duration_sec,
+                    total_items=max(len(manifest_items), 1),
+                    completed_items=status.videos_done
+                    + status.videos_skipped
+                    + status.videos_failed,
                 )
                 status.estimated_remaining_sec = _estimate_remaining(
                     status.total_duration_sec,
@@ -416,6 +622,7 @@ def process_job(job_dir: Path | None = None) -> bool:
                 continue
 
             try:
+                manifest_item.__dict__["captured_at"] = media_probe.get("captured_at")
                 _process_one_item(
                     job_dir=job_dir,
                     request=request,
@@ -452,11 +659,20 @@ def process_job(job_dir: Path | None = None) -> bool:
                 warnings.append(f"{input_item.display_name}: {exc}")
                 append_log(log_path, f"[{now_iso()}] Failed: {input_item.original_path}")
                 append_log(log_path, traceback.format_exc())
+            finally:
+                heartbeat_stop.set()
+                heartbeat_thread.join(timeout=1.0)
 
             status.processed_duration_sec = round(
                 status.processed_duration_sec + manifest_item.duration_seconds, 3
             )
             status.current_media_elapsed_sec = round(monotonic() - item_started, 3)
+            status.progress_percent = _completed_progress_percent(
+                processed_duration_sec=status.processed_duration_sec,
+                total_duration_sec=status.total_duration_sec,
+                total_items=max(len(manifest_items), 1),
+                completed_items=status.videos_done + status.videos_skipped + status.videos_failed,
+            )
             status.estimated_remaining_sec = _estimate_remaining(
                 status.total_duration_sec,
                 status.processed_duration_sec,
@@ -472,6 +688,8 @@ def process_job(job_dir: Path | None = None) -> bool:
         status.message = "Building timeline batches."
         status.current_media = None
         status.current_media_elapsed_sec = 0.0
+        llm_export_started = monotonic()
+        status.progress_percent = 95.0
         _write_status(job_dir, status)
         batch_count, timeline_index_path = _llm_export(job_dir, completed_items)
 
@@ -491,6 +709,15 @@ def process_job(job_dir: Path | None = None) -> bool:
         status.current_media = None
         status.current_media_elapsed_sec = 0.0
         status.estimated_remaining_sec = 0.0
+        status.progress_percent = _overall_progress_percent(
+            processed_duration_sec=status.processed_duration_sec,
+            total_duration_sec=status.total_duration_sec,
+            current_stage="llm_export",
+            current_stage_elapsed_sec=monotonic() - llm_export_started,
+            current_media_duration_sec=0.0,
+            compute_mode=compute_mode,
+        )
+        status.progress_percent = 100.0
         status.completed_at = now_iso()
         _write_status(job_dir, status)
         append_log(
@@ -505,6 +732,7 @@ def process_job(job_dir: Path | None = None) -> bool:
         status.current_stage = "failed"
         status.message = str(exc)
         status.warnings = warnings
+        status.progress_percent = max(status.progress_percent, 1.0)
         status.completed_at = now_iso()
         _write_status(job_dir, status)
         result.state = "failed"

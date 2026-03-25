@@ -31,6 +31,8 @@ builder.Services.Configure<FormOptions>(options =>
 });
 builder.Services.AddSingleton<SettingsStore>();
 builder.Services.AddSingleton<SetupStateService>();
+builder.Services.AddSingleton<ModelCacheService>();
+builder.Services.AddSingleton<WorkerCapabilityService>();
 builder.Services.AddSingleton<ScanService>();
 builder.Services.AddSingleton<RunStore>();
 builder.Services.AddSingleton<UploadSessionStore>();
@@ -218,23 +220,10 @@ app.MapGet("/api/app/version", (AppInstanceService appInstanceService) =>
     });
 });
 
-app.MapGet("/set-language", (string lang, string? returnUrl, LanguageService languageService, HttpContext httpContext) =>
-{
-    languageService.ApplySelection(httpContext.Response, lang);
-    var target = string.IsNullOrWhiteSpace(returnUrl) ? "/" : returnUrl;
-    if (!Uri.IsWellFormedUriString(target, UriKind.Relative))
-    {
-        target = "/";
-    }
-
-    return Results.Redirect(target);
-});
-
 app.Run();
 
 static bool IsAllowedWithoutSetup(PathString path) =>
     path.StartsWithSegments("/settings", StringComparison.OrdinalIgnoreCase) ||
-    path.StartsWithSegments("/set-language", StringComparison.OrdinalIgnoreCase) ||
     path.StartsWithSegments("/api/settings", StringComparison.OrdinalIgnoreCase) ||
     path.StartsWithSegments("/Error", StringComparison.OrdinalIgnoreCase);
 

@@ -92,6 +92,7 @@ internal sealed class TestAppFixture : IAsyncDisposable
         startInfo.Environment["VIDEO2TIMELINE_RUNTIME_DEFAULTS"] = runtimeDefaultsPath;
         startInfo.Environment["VIDEO2TIMELINE_APPDATA_ROOT"] = appDataRoot;
         startInfo.Environment["VIDEO2TIMELINE_UPLOADS_ROOT"] = uploadsRoot;
+        startInfo.Environment["VIDEO2TIMELINE_OUTPUTS_ROOT"] = outputRoot;
         startInfo.Environment["VIDEO2TIMELINE_HF_ACCESS_OVERRIDE"] = "authorized";
         startInfo.Environment["ASPNETCORE_ENVIRONMENT"] = "Development";
 
@@ -172,6 +173,7 @@ internal sealed class TestAppFixture : IAsyncDisposable
                 new { id = "runs", displayName = "Runs", path = outputRoot, enabled = true },
             },
             huggingfaceTermsConfirmed = true,
+            uiLanguage = "en",
         };
 
         await File.WriteAllTextAsync(

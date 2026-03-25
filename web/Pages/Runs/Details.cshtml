@@ -1,6 +1,5 @@
 @page "/runs/{id}"
 @model Video2Timeline.Web.Pages.Runs.DetailsModel
-@using System.Text.Json
 @inject Video2Timeline.Web.Services.LanguageService LanguageService
 @inject Video2Timeline.Web.Services.JsonLocalizationService Localizer
 @{
@@ -23,47 +22,69 @@
         return label == key ? value ?? "-" : label;
     }
 
-    ViewData["Title"] = L("details.page_title");
-
-    var jsMessages = new
+    string StateBadgeClass(string? value) => (value ?? string.Empty).ToLowerInvariant() switch
     {
-        statePending = L("state.pending"),
-        stateRunning = L("state.running"),
-        stateCompleted = L("state.completed"),
-        stateFailed = L("state.failed"),
-        stateCanceled = L("state.canceled"),
-        stageQueued = L("stage.queued"),
-        stagePreflight = L("stage.preflight"),
-        stageExtractAudio = L("stage.extract_audio"),
-        stageTrimSilence = L("stage.trim_silence"),
-        stageTranscribe = L("stage.transcribe"),
-        stageScreens = L("stage.screens"),
-        stageScreenDiff = L("stage.screen_diff"),
-        stageOcrAndCaption = L("stage.ocr_and_caption"),
-        stageTimelineRender = L("stage.timeline_render"),
-        stageLlmExport = L("stage.llm_export"),
-        stageProcessing = L("stage.processing"),
-        unitSec = L("units.sec"),
+        "running" => "status-badge status-badge-info",
+        "pending" => "status-badge status-badge-warning",
+        "completed" => "status-badge status-badge-success",
+        "failed" => "status-badge status-badge-danger",
+        "canceled" => "status-badge status-badge-neutral",
+        _ => "status-badge status-badge-neutral",
     };
+
+    double Percent(double? raw, int done, int total)
+    {
+        if (raw.HasValue && raw.Value > 0)
+        {
+            return Math.Clamp(raw.Value, 0, 100);
+        }
+
+        return total <= 0 ? 0 : Math.Round(done * 100.0 / total, 1);
+    }
+
+    string PercentLabel(double value) => $"{Math.Round(value, 1):0.0}%";
+
+    string FormatDurationFriendly(double? seconds)
+    {
+        var totalSeconds = Math.Max(0, (int)Math.Round(seconds ?? 0));
+        var hours = totalSeconds / 3600;
+        var minutes = (totalSeconds % 3600) / 60;
+        var remainSeconds = totalSeconds % 60;
+        var parts = new List<string>();
+
+        if (hours > 0)
+        {
+            parts.Add($"{hours}{L("units.hour")}");
+        }
+
+        if (minutes > 0 || hours > 0)
+        {
+            parts.Add($"{minutes}{L("units.min")}");
+        }
+
+        parts.Add($"{remainSeconds}{L("units.sec")}");
+        return string.Join(" ", parts);
+    }
+
+    ViewData["Title"] = L("details.page_title");
+    var progressPercent = Percent(status?.ProgressPercent, status?.VideosDone ?? 0, status?.VideosTotal ?? 0);
+    var isActive = string.Equals(status?.State, "pending", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(status?.State, "running", StringComparison.OrdinalIgnoreCase);
 }
 
-<section class="app-page space-y-6" data-job-id="@run.JobId" id="run-details">
+<section class="app-page space-y-6" data-active="@(isActive ? "true" : "false")" id="job-details">
     <div class="panel page-header">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div class="space-y-2">
-                <p class="eyebrow">@L("common.run")</p>
+                <p class="eyebrow">@L("common.job")</p>
                 <h1 class="page-title">@run.JobId</h1>
                 <p class="page-description">@run.RunDirectory</p>
             </div>
             <div class="flex flex-wrap gap-2">
-                <a class="btn-secondary" href="/jobs">
-                    @L("layout.jobs")
-                </a>
+                <a class="btn-secondary" href="/jobs">@L("layout.jobs")</a>
                 @if (string.Equals(status?.State, "completed", StringComparison.OrdinalIgnoreCase))
                 {
-                    <a class="btn-secondary" href="/runs/@run.JobId/download">
-                        @L("details.download_zip")
-                    </a>
+                    <a class="btn-secondary" href="/runs/@run.JobId/download">@L("details.download_zip")</a>
                 }
             </div>
         </div>
@@ -72,91 +93,53 @@
     <section class="grid gap-4 lg:grid-cols-4">
         <div class="metric-card">
             <div class="metric-label">@L("common.state")</div>
-            <div class="metric-value"><span id="state">@StateLabel(status?.State)</span></div>
-            <div class="metric-subtle"><span id="stage">@StageLabel(status?.CurrentStage)</span></div>
+            <div class="metric-value">
+                <span class="@StateBadgeClass(status?.State)">@StateLabel(status?.State)</span>
+            </div>
+            <div class="metric-subtle">@StageLabel(status?.CurrentStage)</div>
         </div>
         <div class="metric-card">
             <div class="metric-label">@L("common.progress")</div>
-            <div class="metric-value"><span id="videos-done">@status?.VideosDone</span> / <span id="videos-total">@status?.VideosTotal</span></div>
+            <div class="metric-value">@PercentLabel(progressPercent)</div>
+            <div class="metric-subtle">@status?.VideosDone / @status?.VideosTotal</div>
+            <div class="progress-track mt-3">
+                <div class="progress-fill" style="width:@(progressPercent.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))%"></div>
+            </div>
         </div>
         <div class="metric-card">
             <div class="metric-label">@L("details.failed")</div>
-            <div class="metric-value" id="videos-failed">@status?.VideosFailed</div>
+            <div class="metric-value">@status?.VideosFailed</div>
         </div>
         <div class="metric-card">
             <div class="metric-label">@L("details.remaining_time")</div>
-            <div class="metric-value" id="eta">@((status?.EstimatedRemainingSec ?? 0).ToString("F0")) @L("units.sec")</div>
+            <div class="metric-value">@FormatDurationFriendly(status?.EstimatedRemainingSec)</div>
         </div>
     </section>
 
-    <section class="grid gap-8 xl:grid-cols-[1.1fr_0.9fr]">
+    <section class="grid gap-8 xl:grid-cols-[0.95fr_1.05fr]">
         <div class="space-y-8">
             <div class="panel">
                 <h2 class="section-title">@L("details.current_processing")</h2>
                 <dl class="mt-4 grid gap-4 text-sm text-slate-700 md:grid-cols-2">
                     <div>
                         <dt class="text-slate-500">@L("details.current_file")</dt>
-                        <dd id="current-media">@status?.CurrentMedia</dd>
+                        <dd>@status?.CurrentMedia</dd>
                     </div>
                     <div>
                         <dt class="text-slate-500">@L("details.message")</dt>
-                        <dd id="message">@status?.Message</dd>
+                        <dd>@status?.Message</dd>
                     </div>
                     <div>
                         <dt class="text-slate-500">@L("details.processed_duration")</dt>
-                        <dd id="processed-duration">@status?.ProcessedDurationSec</dd>
+                        <dd>@FormatDurationFriendly(status?.ProcessedDurationSec)</dd>
                     </div>
                     <div>
                         <dt class="text-slate-500">@L("details.total_duration")</dt>
-                        <dd id="total-duration">@status?.TotalDurationSec</dd>
+                        <dd>@FormatDurationFriendly(status?.TotalDurationSec)</dd>
                     </div>
                 </dl>
             </div>
 
-            <div class="panel">
-                <div class="mb-4 flex items-center justify-between">
-                    <h2 class="section-title">@L("details.generated_timeline")</h2>
-                    @if (!string.IsNullOrWhiteSpace(result?.TimelineIndexPath))
-                    {
-                        <span class="badge-chip">@L("common.batch"): @result?.BatchCount</span>
-                    }
-                </div>
-                <div class="table-shell">
-                    <table class="app-table">
-                        <thead>
-                            <tr>
-                                <th class="px-4 py-3 font-medium">@L("common.media_id")</th>
-                                <th class="px-4 py-3 font-medium">@L("common.status")</th>
-                                <th class="px-4 py-3 font-medium">@L("details.source")</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            @if (run.TimelineItems.Count == 0)
-                            {
-                                <tr>
-                                    <td colspan="3" class="px-4 py-8 text-center text-sm text-slate-500">@L("common.no_items")</td>
-                                </tr>
-                            }
-                            else
-                            {
-                                @foreach (var item in run.TimelineItems)
-                                {
-                                    <tr>
-                                        <td class="px-4 py-3 font-medium text-slate-900">
-                                            <a class="text-sky-700 hover:text-sky-500" href="/runs/@run.JobId/@item.MediaId">@item.MediaId</a>
-                                        </td>
-                                        <td class="px-4 py-3 text-slate-700">@StageLabel(item.Status)</td>
-                                        <td class="px-4 py-3 text-slate-600">@item.SourcePath</td>
-                                    </tr>
-                                }
-                            }
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <div class="space-y-8">
             <div class="panel">
                 <h2 class="section-title">@L("details.result")</h2>
                 <dl class="mt-4 grid gap-4 text-sm text-slate-700">
@@ -178,81 +161,75 @@
                     </div>
                 </dl>
             </div>
+        </div>
 
-            <div class="panel timeline-shell">
-                <h2 class="section-title">@L("details.worker_log")</h2>
-                <pre class="mt-4 max-h-[28rem] text-xs">@run.LogTail</pre>
+        <div class="panel">
+            <div class="mb-4 flex items-center justify-between">
+                <h2 class="section-title">@L("details.generated_timeline")</h2>
+                @if (!string.IsNullOrWhiteSpace(result?.TimelineIndexPath))
+                {
+                    <span class="badge-chip">@L("common.batch"): @result?.BatchCount</span>
+                }
+            </div>
+            <div class="table-shell">
+                <table class="app-table">
+                    <thead>
+                        <tr>
+                            <th>@L("common.media_id")</th>
+                            <th>@L("common.status")</th>
+                            <th>@L("details.source")</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (run.TimelineItems.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="3" class="px-4 py-8 text-center text-sm text-slate-500">@L("details.generated_timeline_empty")</td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var item in run.TimelineItems)
+                            {
+                                <tr>
+                                    <td class="font-medium text-slate-900">
+                                        <a class="text-sky-700 hover:text-sky-500" href="/runs/@run.JobId/@item.MediaId">@item.MediaId</a>
+                                    </td>
+                                    <td>@StageLabel(item.Status)</td>
+                                    <td class="text-slate-600">@item.SourcePath</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
             </div>
         </div>
     </section>
+
+    <section class="panel timeline-shell">
+        <h2 class="section-title">@L("details.worker_log")</h2>
+        <pre class="mt-4 max-h-[32rem] text-xs">@run.LogTail</pre>
+    </section>
 </section>
 
-<script>
-    (() => {
-        const container = document.getElementById("run-details");
-        if (!container) return;
+@section Scripts
+{
+    <script>
+        (() => {
+            const container = document.getElementById("job-details");
+            if (!container) return;
 
-        const messages = @Html.Raw(JsonSerializer.Serialize(jsMessages));
-        const jobId = container.dataset.jobId;
+            const isActive = container.dataset.active === "true";
 
-        const stateLabel = (value) => {
-            switch ((value ?? "").toLowerCase()) {
-                case "pending": return messages.statePending;
-                case "running": return messages.stateRunning;
-                case "completed": return messages.stateCompleted;
-                case "failed": return messages.stateFailed;
-                case "canceled": return messages.stateCanceled;
-                default: return value ?? "";
+            window.addEventListener("pageshow", (event) => {
+                if (event.persisted) {
+                    location.reload();
+                }
+            });
+
+            if (isActive) {
+                window.setInterval(() => location.reload(), 5000);
             }
-        };
-
-        const stageLabel = (value) => {
-            switch ((value ?? "").toLowerCase()) {
-                case "queued": return messages.stageQueued;
-                case "preflight": return messages.stagePreflight;
-                case "extract_audio": return messages.stageExtractAudio;
-                case "trim_silence": return messages.stageTrimSilence;
-                case "transcribe": return messages.stageTranscribe;
-                case "screens": return messages.stageScreens;
-                case "screen_diff": return messages.stageScreenDiff;
-                case "ocr_and_caption": return messages.stageOcrAndCaption;
-                case "timeline_render": return messages.stageTimelineRender;
-                case "llm_export": return messages.stageLlmExport;
-                case "processing": return messages.stageProcessing;
-                case "completed": return messages.stateCompleted;
-                case "failed": return messages.stateFailed;
-                default: return value ?? "";
-            }
-        };
-
-        const setText = (id, value) => {
-            const element = document.getElementById(id);
-            if (element) {
-                element.textContent = value ?? "";
-            }
-        };
-
-        const update = async () => {
-            try {
-                const response = await fetch(`/api/jobs/${jobId}`);
-                if (!response.ok) return;
-                const liveStatus = await response.json();
-                setText("state", stateLabel(liveStatus.state));
-                setText("stage", stageLabel(liveStatus.current_stage));
-                setText("videos-done", liveStatus.videos_done);
-                setText("videos-total", liveStatus.videos_total);
-                setText("videos-failed", liveStatus.videos_failed);
-                setText("eta", `${Math.round(liveStatus.estimated_remaining_sec ?? 0)} ${messages.unitSec}`);
-                setText("current-media", liveStatus.current_media);
-                setText("message", liveStatus.message);
-                setText("processed-duration", liveStatus.processed_duration_sec);
-                setText("total-duration", liveStatus.total_duration_sec);
-            } catch {
-                // ignore local polling errors
-            }
-        };
-
-        update();
-        setInterval(update, 5000);
-    })();
-</script>
+        })();
+    </script>
+}

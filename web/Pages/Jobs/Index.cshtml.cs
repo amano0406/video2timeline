@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Video2Timeline.Web.Models;
@@ -36,6 +37,20 @@ public sealed class IndexModel(
             ModelState.AddModelError(string.Empty, ex.Message);
             return Page();
         }
+    }
+
+    public async Task<IActionResult> OnPostDeleteAllAsync(string confirmation, CancellationToken cancellationToken)
+    {
+        await LoadPageAsync(cancellationToken);
+        if (!string.Equals(confirmation, "DELETE", StringComparison.Ordinal))
+        {
+            ModelState.AddModelError(string.Empty, L("jobs.list.delete_all_invalid"));
+            return Page();
+        }
+
+        var deleted = await runStore.DeleteCompletedRunsAsync(cancellationToken);
+        StatusMessage = string.Format(CultureInfo.CurrentCulture, L("jobs.list.delete_all_deleted"), deleted);
+        return RedirectToPage();
     }
 
     private async Task LoadPageAsync(CancellationToken cancellationToken)

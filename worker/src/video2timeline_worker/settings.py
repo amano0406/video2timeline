@@ -14,6 +14,10 @@ def uploads_root() -> Path:
     return Path(os.getenv("VIDEO2TIMELINE_UPLOADS_ROOT", "/shared/uploads"))
 
 
+def outputs_root() -> Path:
+    return Path(os.getenv("VIDEO2TIMELINE_OUTPUTS_ROOT", str(appdata_root() / "outputs")))
+
+
 def runtime_defaults_path() -> Path:
     return Path(os.getenv("VIDEO2TIMELINE_RUNTIME_DEFAULTS", "/app/config/runtime.defaults.json"))
 
@@ -33,6 +37,10 @@ def token_path() -> Path:
     return appdata_root() / "secrets" / "huggingface.token"
 
 
+def worker_capabilities_path() -> Path:
+    return appdata_root() / "worker-capabilities.json"
+
+
 def load_settings() -> dict[str, Any]:
     if settings_path().exists():
         payload = json.loads(settings_path().read_text(encoding="utf-8"))
@@ -45,10 +53,28 @@ def load_settings() -> dict[str, Any]:
             "videoExtensions": defaults.get("videoExtensions", []),
             "huggingfaceTermsConfirmed": False,
             "computeMode": "cpu",
+            "uiLanguage": "en",
         }
+    payload["inputRoots"] = [
+        {
+            "id": "uploads",
+            "displayName": "Uploads",
+            "path": str(uploads_root()),
+            "enabled": True,
+        }
+    ]
+    payload["outputRoots"] = [
+        {
+            "id": "runs",
+            "displayName": "Runs",
+            "path": str(outputs_root()),
+            "enabled": True,
+        }
+    ]
     payload["computeMode"] = str(payload.get("computeMode") or "cpu").strip().lower()
     if payload["computeMode"] not in {"cpu", "gpu"}:
         payload["computeMode"] = "cpu"
+    payload["uiLanguage"] = str(payload.get("uiLanguage") or "en").strip() or "en"
     return payload
 
 
@@ -73,3 +99,9 @@ def save_huggingface_token(token: str | None) -> None:
         return
     if path.exists():
         path.unlink()
+
+
+def save_worker_capabilities(payload: dict[str, Any]) -> None:
+    path = worker_capabilities_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")

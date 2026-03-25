@@ -26,7 +26,7 @@ public sealed class DashboardSmokeTests : PageTest
     [TestMethod]
     public async Task Root_Redirects_To_NewJob()
     {
-        await SetLanguageAsync("en", "/");
+        await Page.GotoAsync($"{_fixture.BaseUrl}/");
 
         await Expect(Page).ToHaveURLAsync(new Regex(".*/jobs/new$"));
         await Expect(Page.Locator("html")).ToHaveAttributeAsync("lang", "en");
@@ -37,22 +37,21 @@ public sealed class DashboardSmokeTests : PageTest
     [TestMethod]
     public async Task Settings_Shows_Save_Button_And_Theme_Options()
     {
-        await SetLanguageAsync("en", "/settings");
+        await Page.GotoAsync($"{_fixture.BaseUrl}/settings");
 
         await Expect(Page.Locator("html")).ToHaveAttributeAsync("lang", "en");
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Settings" })).ToBeVisibleAsync();
-        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save Settings" })).ToBeVisibleAsync();
-        await Expect(Page.GetByText("Workbench")).ToBeVisibleAsync();
-        await Expect(Page.GetByText("Classic")).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save And Continue" })).ToBeVisibleAsync();
+        await Expect(Page.GetByLabel("Language")).ToBeVisibleAsync();
     }
 
     [TestMethod]
     public async Task Jobs_Page_Shows_Completed_Run()
     {
-        await SetLanguageAsync("en", "/jobs");
+        await Page.GotoAsync($"{_fixture.BaseUrl}/jobs");
 
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Jobs", Exact = true })).ToBeVisibleAsync();
-        await Expect(Page.GetByText("There is no active job right now.")).ToBeVisibleAsync();
+        await Expect(Page.GetByText("Now Processing")).ToHaveCountAsync(0);
         await Expect(Page.GetByText(_fixture.CompletedJobId)).ToBeVisibleAsync();
         await Expect(Page.GetByRole(AriaRole.Link, new() { Name = "ZIP" })).ToBeVisibleAsync();
     }
@@ -60,7 +59,7 @@ public sealed class DashboardSmokeTests : PageTest
     [TestMethod]
     public async Task CompletedRunDetails_ExposeZip_AndTimeline()
     {
-        await SetLanguageAsync("en", $"/runs/{_fixture.CompletedJobId}");
+        await Page.GotoAsync($"{_fixture.BaseUrl}/runs/{_fixture.CompletedJobId}");
 
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = _fixture.CompletedJobId })).ToBeVisibleAsync();
         await Expect(Page.GetByRole(AriaRole.Link, new() { Name = "Download ZIP" })).ToBeVisibleAsync();
@@ -75,7 +74,7 @@ public sealed class DashboardSmokeTests : PageTest
     [TestMethod]
     public async Task CompletedRunDetails_CanDownloadZip()
     {
-        await SetLanguageAsync("en", $"/runs/{_fixture.CompletedJobId}");
+        await Page.GotoAsync($"{_fixture.BaseUrl}/runs/{_fixture.CompletedJobId}");
 
         var download = await Page.RunAndWaitForDownloadAsync(async () =>
         {
@@ -83,11 +82,5 @@ public sealed class DashboardSmokeTests : PageTest
         });
 
         Assert.AreEqual($"{_fixture.CompletedJobId}.zip", download.SuggestedFilename);
-    }
-
-    private async Task SetLanguageAsync(string language, string returnPath)
-    {
-        var encoded = Uri.EscapeDataString(returnPath);
-        await Page.GotoAsync($"{_fixture.BaseUrl}/set-language?lang={language}&returnUrl={encoded}");
     }
 }

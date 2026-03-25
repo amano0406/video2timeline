@@ -125,21 +125,19 @@ macOS:
 Then:
 
 1. `start.bat` / `start.command` creates `.env` automatically if it does not exist
-2. set your input and output paths in `.env`
-3. open `http://localhost:38090`
-4. complete `Settings` first
-5. choose `CPU` or `GPU` mode in `Settings`
-6. save your Hugging Face token if you want diarization
-7. approve the required model page
-8. upload files or choose a directory
-9. start a job
-10. download the completed ZIP package
+2. open `http://localhost:38090`
+3. complete `Settings` first
+4. choose `CPU` or `GPU` mode in `Settings`
+5. save your Hugging Face token if you want diarization
+6. approve the required model page
+7. upload files or choose a directory
+8. start a job
+9. download the completed ZIP package
 
 The start script also checks:
 
 - whether Docker Desktop is installed
 - whether the Docker engine is actually running
-- whether `.env` still contains placeholder paths
 - whether `web` and `worker` both reach a running state
 - whether the local web UI responds before the browser is opened
 - whether an NVIDIA GPU is present, and if so, it starts the worker with GPU access enabled
@@ -149,6 +147,15 @@ Stop:
 ```powershell
 .\stop.bat
 ```
+
+Complete reset:
+
+```powershell
+.\reset.bat
+```
+
+The reset script asks for confirmation before it removes Docker resources. It can also delete `.env` and the generated output directory if you explicitly confirm those steps.
+By default it asks separately whether you also want to delete the saved app-data volume. That volume contains the saved Hugging Face token and app settings.
 
 ## Supported Input Formats
 
@@ -165,7 +172,7 @@ Actual decoding depends on the `ffmpeg` build available in the runtime image.
 
 ## Localization
 
-The UI shell includes a language switcher in the sidebar.
+You can change the app language in `Settings`.
 
 Current supported locales:
 
@@ -179,7 +186,7 @@ Current supported locales:
 - `de`
 - `pt`
 
-Browser language is used as the default when possible. Manual selection is stored in a cookie. Supported language aliases and regional mappings are defined in [web/Resources/Locales/languages.json](web/Resources/Locales/languages.json).
+English is the default on first launch. Manual selection is stored in a cookie. Supported language aliases and regional mappings are defined in [web/Resources/Locales/languages.json](web/Resources/Locales/languages.json).
 
 ## CLI
 
@@ -193,6 +200,7 @@ Current commands include:
 - `jobs list`
 - `jobs show`
 - `jobs run`
+- `jobs archive`
 - `scan`
 - `compare-images`
 - `run-job`
@@ -206,11 +214,13 @@ python -m video2timeline_worker settings status
 python -m video2timeline_worker settings save --token hf_xxx --terms-confirmed
 python -m video2timeline_worker jobs create --file C:\path\to\clip.mp4
 python -m video2timeline_worker jobs create --directory C:\path\to\folder
-python -m video2timeline_worker jobs create --source-id primary
 python -m video2timeline_worker jobs list
+python -m video2timeline_worker jobs archive --job-id run-YYYYMMDD-HHMMSS-xxxx
 ```
 
 The GUI remains the recommended public entry point. The CLI can create and run the same job contract directly from local files, directories, or configured source roots, and is intended for scripting, debugging, and power-user workflows.
+
+If you want the CLI flow to match the GUI packaging flow, use `jobs archive` after a completed run. That command creates a ZIP package for the selected job so it can be handed to ChatGPT or another LLM workflow.
 
 ## Output Layout
 

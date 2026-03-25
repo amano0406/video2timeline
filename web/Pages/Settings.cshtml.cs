@@ -7,8 +7,10 @@ namespace Video2Timeline.Web.Pages;
 
 public sealed class SettingsModel(
     HuggingFaceAccessService accessService,
+    ModelCacheService modelCacheService,
     SettingsStore settingsStore,
     SetupStateService setupStateService,
+    WorkerCapabilityService workerCapabilityService,
     LanguageService languageService,
     JsonLocalizationService localizer) : PageModel
 {
@@ -16,14 +18,20 @@ public sealed class SettingsModel(
 
     public SetupState SetupState { get; private set; } = new();
 
+    public IReadOnlyList<GatedModelStatusItem> ModelStatuses { get; private set; } = [];
+
+    public ModelCacheSnapshot ModelCache { get; private set; } = new();
+
+    public WorkerCapabilitySnapshot WorkerCapability { get; private set; } = new();
+
     [BindProperty]
     public string Token { get; set; } = "";
 
     [BindProperty]
-    public bool TermsConfirmed { get; set; }
+    public string ComputeMode { get; set; } = "cpu";
 
     [BindProperty]
-    public string ComputeMode { get; set; } = "cpu";
+    public string UiLanguage { get; set; } = "en";
 
     public string? StatusMessage { get; private set; }
 
@@ -44,9 +52,10 @@ public sealed class SettingsModel(
             ModelState.AddModelError(nameof(Token), L("settings.token_required"));
         }
 
-        if (!TermsConfirmed)
+        WorkerCapability = await workerCapabilityService.GetAsync(cancellationToken);
+        if (string.Equals(ComputeMode, "gpu", StringComparison.OrdinalIgnoreCase) && !WorkerCapability.GpuAvailable)
         {
-            ModelState.AddModelError(nameof(TermsConfirmed), L("settings.terms_required"));
+            ModelState.AddModelError(nameof(ComputeMode), L("settings.compute_mode.gpu_unavailable"));
         }
 
         if (!ModelState.IsValid)
@@ -56,13 +65,20 @@ public sealed class SettingsModel(
             return Page();
         }
 
-        await settingsStore.SaveHuggingFaceAsync(
-            string.IsNullOrWhiteSpace(Token) ? null : Token,
-            TermsConfirmed,
-            cancellationToken);
-
         var settings = await settingsStore.LoadAsync(cancellationToken);
         settings.ComputeMode = ComputeMode;
+        settings.UiLanguage = languageService.Normalize(UiLanguage) ?? "en";
+        settings.HuggingfaceTermsConfirmed = false;
+        await settingsStore.SaveAsync(
+            settings,
+            string.IsNullOrWhiteSpace(Token) ? null : Token,
+            replaceToken: !string.IsNullOrWhiteSpace(Token),
+            cancellationToken: cancellationToken);
+
+        Snapshot = await accessService.GetSnapshotAsync(cancellationToken);
+        settings.HuggingfaceTermsConfirmed = Snapshot.Models.Any(static model =>
+            string.Equals(model.ModelId, "pyannote/speaker-diarization-community-1", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(model.AccessState, "authorized", StringComparison.OrdinalIgnoreCase));
         await settingsStore.SaveAsync(settings, cancellationToken: cancellationToken);
 
         await LoadPageAsync(cancellationToken);
@@ -76,14 +92,27 @@ public sealed class SettingsModel(
         return Page();
     }
 
+    public async Task<IActionResult> OnPostClearModelCacheAsync(CancellationToken cancellationToken)
+    {
+        var cleared = await modelCacheService.ClearAsync(cancellationToken);
+        TempData["StatusMessage"] = cleared > 0
+            ? L("settings.cache.cleared")
+            : L("settings.cache.empty");
+        return RedirectToPage();
+    }
+
     private async Task LoadPageAsync(CancellationToken cancellationToken)
     {
         Snapshot = await accessService.GetSnapshotAsync(cancellationToken);
         SetupState = await setupStateService.GetAsync(cancellationToken);
-        TermsConfirmed = SetupState.TermsConfirmed;
+        ModelStatuses = Snapshot.Models;
+        ModelCache = await modelCacheService.GetSnapshotAsync(cancellationToken);
+        WorkerCapability = await workerCapabilityService.GetAsync(cancellationToken);
         Token = await settingsStore.ReadTokenAsync(cancellationToken) ?? "";
         var settings = await settingsStore.LoadAsync(cancellationToken);
         ComputeMode = settings.ComputeMode;
+        UiLanguage = languageService.Normalize(settings.UiLanguage) ?? "en";
+        StatusMessage ??= TempData["StatusMessage"] as string;
     }
 
     private string L(string key) => localizer.Get(languageService.Resolve(Request), key);

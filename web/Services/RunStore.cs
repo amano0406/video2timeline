@@ -202,6 +202,47 @@ public sealed class RunStore(AppPaths paths, SettingsStore settingsStore, ScanSe
         Directory.Delete(runDirectory, recursive: true);
     }
 
+    public async Task<int> DeleteCompletedRunsAsync(CancellationToken cancellationToken = default)
+    {
+        var deleted = 0;
+        var settings = await settingsStore.LoadAsync(cancellationToken);
+        foreach (var root in settings.OutputRoots.Where(static root => root.Enabled))
+        {
+            if (!Directory.Exists(root.Path))
+            {
+                continue;
+            }
+
+            foreach (var runDirectory in Directory.EnumerateDirectories(root.Path, "run-*", SearchOption.TopDirectoryOnly))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var status = await ReadJsonAsync<JobStatusDocument>(Path.Combine(runDirectory, "status.json"), cancellationToken);
+                if (status is null ||
+                    string.Equals(status.State, "pending", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(status.State, "running", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var request = await ReadJsonAsync<JobRequestDocument>(Path.Combine(runDirectory, "request.json"), cancellationToken);
+                DeleteUploadDirectories(request);
+                Directory.Delete(runDirectory, recursive: true);
+                deleted++;
+            }
+        }
+
+        if (Directory.Exists(paths.DownloadsRoot))
+        {
+            foreach (var archive in Directory.EnumerateFiles(paths.DownloadsRoot, "*.zip", SearchOption.TopDirectoryOnly))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                File.Delete(archive);
+            }
+        }
+
+        return deleted;
+    }
+
     public async Task<int> CleanupExpiredUploadsAsync(TimeSpan retention, CancellationToken cancellationToken = default)
     {
         var deletedCount = 0;
@@ -265,9 +306,24 @@ public sealed class RunStore(AppPaths paths, SettingsStore settingsStore, ScanSe
             File.Delete(destination);
         }
 
-        await Task.Run(
-            () => ZipFile.CreateFromDirectory(runDirectory, destination, CompressionLevel.Fastest, includeBaseDirectory: true),
-            cancellationToken);
+        var stagingRoot = Path.Combine(paths.DownloadsRoot, $"{jobId}-export-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(stagingRoot);
+
+        try
+        {
+            await Task.Run(() => BuildExportPackage(runDirectory, jobId, stagingRoot), cancellationToken);
+            await Task.Run(
+                () => ZipFile.CreateFromDirectory(stagingRoot, destination, CompressionLevel.Fastest, includeBaseDirectory: false),
+                cancellationToken);
+        }
+        finally
+        {
+            if (Directory.Exists(stagingRoot))
+            {
+                Directory.Delete(stagingRoot, recursive: true);
+            }
+        }
+
         return destination;
     }
 
@@ -371,6 +427,11 @@ public sealed class RunStore(AppPaths paths, SettingsStore settingsStore, ScanSe
                     VideosFailed = status.VideosFailed,
                     TotalSizeBytes = totalSizeBytes,
                     TotalDurationSec = totalDurationSec,
+                    ProgressPercent = status.ProgressPercent > 0
+                        ? status.ProgressPercent
+                        : status.VideosTotal > 0
+                            ? Math.Round(status.VideosDone * 100.0 / status.VideosTotal, 1)
+                            : 0,
                     UpdatedAt = status.UpdatedAt,
                     CreatedAt = request.CreatedAt,
                 });
@@ -573,5 +634,160 @@ public sealed class RunStore(AppPaths paths, SettingsStore settingsStore, ScanSe
         var normalizedRoot = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
             + Path.DirectorySeparatorChar;
         return candidate.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void BuildExportPackage(string runDirectory, string jobId, string exportRoot)
+    {
+        Directory.CreateDirectory(exportRoot);
+        var timelineRows = new List<(string MediaId, string Label, string TimelinePath, string SourcePath)>();
+        var mediaRoot = Path.Combine(runDirectory, "media");
+
+        if (Directory.Exists(mediaRoot))
+        {
+            foreach (var mediaDirectory in Directory.EnumerateDirectories(mediaRoot).OrderBy(static value => value, StringComparer.OrdinalIgnoreCase))
+            {
+                var mediaId = Path.GetFileName(mediaDirectory);
+                var timelinePath = Path.Combine(mediaDirectory, "timeline", "timeline.md");
+                if (!File.Exists(timelinePath))
+                {
+                    continue;
+                }
+
+                SourceInfoExportDocument? sourceInfo = null;
+                var sourcePath = Path.Combine(mediaDirectory, "source.json");
+                if (File.Exists(sourcePath))
+                {
+                    try
+                    {
+                        sourceInfo = JsonSerializer.Deserialize<SourceInfoExportDocument>(File.ReadAllText(sourcePath));
+                    }
+                    catch
+                    {
+                        sourceInfo = null;
+                    }
+                }
+
+                timelineRows.Add((
+                    mediaId,
+                    BestExportLabel(mediaId, sourceInfo),
+                    timelinePath,
+                    sourceInfo?.OriginalPath ?? string.Empty));
+            }
+        }
+
+        timelineRows = timelineRows
+            .OrderBy(static row => row.Label, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(static row => row.MediaId, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var transcriptionInfoPath = Path.Combine(runDirectory, "TRANSCRIPTION_INFO.md");
+        if (File.Exists(transcriptionInfoPath))
+        {
+            File.Copy(transcriptionInfoPath, Path.Combine(exportRoot, "00_TRANSCRIPTION_INFO.md"), overwrite: true);
+        }
+
+        var packageInfo = string.Join(
+            Environment.NewLine,
+            [
+                "# Export Package",
+                "",
+                $"- Job ID: `{jobId}`",
+                "- Open the numbered `.md` files.",
+                "- Each file is the timeline for one video.",
+                "- This ZIP is reduced for LLM upload and review.",
+                "",
+            ]);
+        File.WriteAllText(Path.Combine(exportRoot, "00_PACKAGE_INFO.md"), packageInfo);
+
+        var indexLines = new List<string> { "# Files", string.Empty };
+        for (var index = 0; index < timelineRows.Count; index++)
+        {
+            var row = timelineRows[index];
+            var fileName = $"{index + 1:00}_{row.Label}.md";
+            File.Copy(row.TimelinePath, Path.Combine(exportRoot, fileName), overwrite: true);
+            indexLines.Add($"- `{fileName}`");
+            if (!string.IsNullOrWhiteSpace(row.SourcePath))
+            {
+                indexLines.Add($"  - Source: `{row.SourcePath}`");
+            }
+        }
+
+        File.WriteAllText(
+            Path.Combine(exportRoot, "01_INDEX.md"),
+            string.Join(Environment.NewLine, indexLines).TrimEnd() + Environment.NewLine);
+    }
+
+    private static string BestExportLabel(string mediaId, SourceInfoExportDocument? sourceInfo)
+    {
+        var candidates = new[]
+        {
+            sourceInfo?.CapturedAt,
+            sourceInfo?.DisplayName,
+            sourceInfo?.OriginalPath,
+            mediaId,
+        };
+
+        foreach (var candidate in candidates)
+        {
+            if (string.IsNullOrWhiteSpace(candidate))
+            {
+                continue;
+            }
+
+            if (TryParseBestEffortDateTime(candidate, out var parsed))
+            {
+                return parsed.ToString("yyyy-MM-dd HH-mm-ss", System.Globalization.CultureInfo.InvariantCulture);
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(sourceInfo?.ResolvedPath) && File.Exists(sourceInfo.ResolvedPath))
+        {
+            return File.GetLastWriteTime(sourceInfo.ResolvedPath).ToString("yyyy-MM-dd HH-mm-ss", System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        return MakeSafeFileName(mediaId);
+    }
+
+    private static bool TryParseBestEffortDateTime(string value, out DateTime parsed)
+    {
+        if (DateTime.TryParse(value, out parsed))
+        {
+            return true;
+        }
+
+        foreach (var pattern in new[]
+                 {
+                     "yyyy-MM-dd HH-mm-ss",
+                     "yyyy-MM-dd HH:mm:ss",
+                     "yyyyMMdd-HHmmss",
+                     "yyyyMMddHHmmss",
+                     "yyyy-MM-ddTHH:mm:ss",
+                     "yyyy-MM-ddTHH:mm:ssK",
+                 })
+        {
+            if (DateTime.TryParseExact(
+                value,
+                pattern,
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AllowWhiteSpaces | System.Globalization.DateTimeStyles.AssumeLocal,
+                out parsed))
+            {
+                return true;
+            }
+        }
+
+        parsed = default;
+        return false;
+    }
+
+    private sealed class SourceInfoExportDocument
+    {
+        public string? OriginalPath { get; set; }
+
+        public string? ResolvedPath { get; set; }
+
+        public string? DisplayName { get; set; }
+
+        public string? CapturedAt { get; set; }
     }
 }

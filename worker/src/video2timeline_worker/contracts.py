@@ -75,6 +75,7 @@ class JobStatus:
     processed_duration_sec: float = 0.0
     total_duration_sec: float = 0.0
     estimated_remaining_sec: float | None = None
+    progress_percent: float = 0.0
     started_at: str | None = None
     updated_at: str | None = None
     completed_at: str | None = None

@@ -16,14 +16,20 @@ public sealed class SettingsStore(AppPaths paths)
         if (File.Exists(paths.SettingsPath))
         {
             await using var stream = File.OpenRead(paths.SettingsPath);
-            var loaded = await JsonSerializer.DeserializeAsync<AppSettingsDocument>(stream, _jsonOptions, cancellationToken);
+            var loaded = await JsonSerializer.DeserializeAsync<AppSettingsDocument>(
+                stream,
+                _jsonOptions,
+                cancellationToken);
             return Normalize(loaded ?? new AppSettingsDocument());
         }
 
         if (File.Exists(paths.RuntimeDefaultsPath))
         {
             await using var stream = File.OpenRead(paths.RuntimeDefaultsPath);
-            var defaults = await JsonSerializer.DeserializeAsync<AppSettingsDocument>(stream, _jsonOptions, cancellationToken);
+            var defaults = await JsonSerializer.DeserializeAsync<AppSettingsDocument>(
+                stream,
+                _jsonOptions,
+                cancellationToken);
             return Normalize(defaults ?? new AppSettingsDocument());
         }
 
@@ -84,43 +90,56 @@ public sealed class SettingsStore(AppPaths paths)
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 
-    public async Task SaveHuggingFaceAsync(string? token, bool termsConfirmed, CancellationToken cancellationToken = default)
+    public async Task SaveHuggingFaceAsync(
+        string? token,
+        bool termsConfirmed,
+        CancellationToken cancellationToken = default)
     {
         var settings = await LoadAsync(cancellationToken);
         settings.HuggingfaceTermsConfirmed = termsConfirmed;
-        await SaveAsync(settings, token, replaceToken: !string.IsNullOrWhiteSpace(token), cancellationToken);
+        await SaveAsync(
+            settings,
+            token,
+            replaceToken: !string.IsNullOrWhiteSpace(token),
+            cancellationToken);
     }
 
-    public string TermsNotice =>
-        "pyannote の話者分離を使うには、Hugging Face token の保存と gated model へのアクセス承認が必要です。";
-
-    private static AppSettingsDocument Normalize(AppSettingsDocument value)
+    private AppSettingsDocument Normalize(AppSettingsDocument value)
     {
-        value.InputRoots ??= [];
-        value.OutputRoots ??= [];
-        value.VideoExtensions ??= [];
-        value.InputRoots = value.InputRoots
-            .Where(static row => !string.IsNullOrWhiteSpace(row.Id) && !string.IsNullOrWhiteSpace(row.Path))
-            .ToList();
-        value.OutputRoots = value.OutputRoots
-            .Where(static row => !string.IsNullOrWhiteSpace(row.Id) && !string.IsNullOrWhiteSpace(row.Path))
-            .ToList();
-        if (value.OutputRoots.Count > 1)
-        {
-            value.OutputRoots = [value.OutputRoots.First()];
-        }
+        value.InputRoots =
+        [
+            new RootOption
+            {
+                Id = "uploads",
+                DisplayName = "Uploads",
+                Path = paths.UploadsRoot,
+                Enabled = true,
+            },
+        ];
 
-        if (value.OutputRoots.Count == 1)
-        {
-            value.OutputRoots[0].Id = "runs";
-            value.OutputRoots[0].DisplayName = "Runs";
-            value.OutputRoots[0].Enabled = true;
-        }
+        value.OutputRoots =
+        [
+            new RootOption
+            {
+                Id = "runs",
+                DisplayName = "Runs",
+                Path = paths.OutputsRoot,
+                Enabled = true,
+            },
+        ];
+
+        value.VideoExtensions ??= [];
 
         value.ComputeMode = value.ComputeMode?.Trim().ToLowerInvariant() switch
         {
             "gpu" => "gpu",
             _ => "cpu",
+        };
+
+        value.UiLanguage = value.UiLanguage?.Trim() switch
+        {
+            { Length: > 0 } language => language,
+            _ => "en",
         };
 
         return value;

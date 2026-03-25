@@ -8,10 +8,11 @@ internal sealed record LanguageDefinition(string Code, string NativeName, IReadO
 
 internal sealed record LanguageCatalog(string DefaultLanguage, IReadOnlyList<LanguageDefinition> Definitions);
 
-public sealed class LanguageService(IWebHostEnvironment environment, ILogger<LanguageService> logger)
+public sealed class LanguageService(
+    IWebHostEnvironment environment,
+    AppPaths paths,
+    ILogger<LanguageService> logger)
 {
-    public const string CookieName = "video2timeline_lang";
-
     private readonly Lazy<LanguageCatalog> _catalog = new(() => LoadCatalog(environment, logger));
 
     public IReadOnlyList<SupportedLanguage> GetSupportedLanguages() =>
@@ -25,43 +26,13 @@ public sealed class LanguageService(IWebHostEnvironment environment, ILogger<Lan
             return fromQuery;
         }
 
-        if (request.Cookies.TryGetValue(CookieName, out var cookieValue))
+        var fromSettings = LoadSavedLanguage(paths, logger);
+        if (fromSettings is not null)
         {
-            var fromCookie = Normalize(cookieValue);
-            if (fromCookie is not null)
-            {
-                return fromCookie;
-            }
-        }
-
-        var header = request.Headers.AcceptLanguage.ToString();
-        if (!string.IsNullOrWhiteSpace(header))
-        {
-            var first = header.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Select(static value => value.Split(';', StringSplitOptions.TrimEntries)[0])
-                .Select(Normalize)
-                .FirstOrDefault(static value => value is not null);
-            if (first is not null)
-            {
-                return first;
-            }
+            return fromSettings;
         }
 
         return _catalog.Value.DefaultLanguage;
-    }
-
-    public void ApplySelection(HttpResponse response, string language)
-    {
-        var normalized = Normalize(language) ?? _catalog.Value.DefaultLanguage;
-        response.Cookies.Append(
-            CookieName,
-            normalized,
-            new CookieOptions
-            {
-                IsEssential = true,
-                Expires = DateTimeOffset.UtcNow.AddYears(1),
-                SameSite = SameSiteMode.Lax,
-            });
     }
 
     public string? Normalize(string? language)
@@ -147,23 +118,47 @@ public sealed class LanguageService(IWebHostEnvironment environment, ILogger<Lan
 
     private static LanguageCatalog GetDefaultCatalog() =>
         new(
-            "ja",
+            "en",
             [
-                new("ja", "日本語", ["ja"]),
+                new("ja", "Japanese", ["ja"]),
                 new("en", "English", ["en"]),
-                new("zh-CN", "简体中文", ["zh-cn", "zh-sg", "zh-hans"]),
-                new("zh-TW", "繁體中文", ["zh-tw", "zh-hk", "zh-mo", "zh-hant"]),
-                new("ko", "한국어", ["ko"]),
-                new("es", "Español", ["es"]),
-                new("fr", "Français", ["fr"]),
+                new("zh-CN", "Simplified Chinese", ["zh-cn", "zh-sg", "zh-hans"]),
+                new("zh-TW", "Traditional Chinese", ["zh-tw", "zh-hk", "zh-mo", "zh-hant"]),
+                new("ko", "Korean", ["ko"]),
+                new("es", "Spanish", ["es"]),
+                new("fr", "French", ["fr"]),
                 new("de", "Deutsch", ["de"]),
-                new("pt", "Português", ["pt"]),
+                new("pt", "Portuguese", ["pt"]),
             ]);
+
+    private static string? LoadSavedLanguage(AppPaths paths, ILogger<LanguageService> logger)
+    {
+        if (!File.Exists(paths.SettingsPath))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(paths.SettingsPath));
+            if (document.RootElement.TryGetProperty("uiLanguage", out var value) &&
+                value.ValueKind == JsonValueKind.String)
+            {
+                return value.GetString();
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Failed to read saved language from {SettingsPath}", paths.SettingsPath);
+        }
+
+        return null;
+    }
 }
 
 internal sealed class LanguageCatalogDocument
 {
-    public string DefaultLanguage { get; set; } = "ja";
+    public string DefaultLanguage { get; set; } = "en";
 
     public List<LanguageCatalogLanguageDocument> Languages { get; set; } = [];
 }

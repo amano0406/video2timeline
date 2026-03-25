@@ -25,54 +25,10 @@ read_env_value() {
   grep -E "^${key}=" .env | tail -n 1 | cut -d'=' -f2-
 }
 
-is_placeholder() {
-  local value="$1"
-  [[ -z "$value" || "$value" == *":\\path\\to\\"* || "$value" == *"/path/to/"* ]]
-}
-
-validate_input_path() {
-  local key="$1"
-  local value="$2"
-
-  if is_placeholder "$value"; then
-    echo "${key} still uses a placeholder value in .env."
-    echo "Edit .env and set it to a real directory before starting."
-    exit 1
-  fi
-
-  if [ ! -d "$value" ]; then
-    echo "${key} does not exist: $value"
-    exit 1
-  fi
-}
-
-validate_output_path() {
-  local key="$1"
-  local value="$2"
-
-  if is_placeholder "$value"; then
-    echo "${key} still uses a placeholder value in .env."
-    echo "Edit .env and set it to a real directory before starting."
-    exit 1
-  fi
-
-  if [ ! -d "$value" ]; then
-    echo "Creating output directory: $value"
-    mkdir -p "$value"
-  fi
-}
-
-VIDEO_SOURCE_1="$(read_env_value VIDEO_SOURCE_1)"
-VIDEO_SOURCE_2="$(read_env_value VIDEO_SOURCE_2)"
-VIDEO_OUTPUT_ROOT="$(read_env_value VIDEO_OUTPUT_ROOT)"
 WEB_PORT="$(read_env_value VIDEO2TIMELINE_WEB_PORT)"
 if [ -z "${WEB_PORT}" ]; then
   WEB_PORT="38090"
 fi
-
-validate_input_path "VIDEO_SOURCE_1" "$VIDEO_SOURCE_1"
-validate_input_path "VIDEO_SOURCE_2" "$VIDEO_SOURCE_2"
-validate_output_path "VIDEO_OUTPUT_ROOT" "$VIDEO_OUTPUT_ROOT"
 
 echo "Starting web and worker containers..."
 compose_args=(-f docker-compose.yml)
