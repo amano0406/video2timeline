@@ -6,7 +6,6 @@ import time
 from pathlib import Path
 
 from .config import AppConfig, ChangeDetectionConfig, OcrPolicy, SourceDirectory, load_config
-from .contracts import JobRequest
 from .discovery import discover_videos
 from .job_store import (
     collect_input_items,
@@ -16,7 +15,13 @@ from .job_store import (
     list_runs,
     settings_snapshot,
 )
-from .settings import load_huggingface_token, load_runtime_defaults, load_settings, save_huggingface_token, save_settings
+from .settings import (
+    load_huggingface_token,
+    load_runtime_defaults,
+    load_settings,
+    save_huggingface_token,
+    save_settings,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -25,9 +30,13 @@ def parse_args() -> argparse.Namespace:
 
     settings_parser = subparsers.add_parser("settings", help="Show or update local settings.")
     settings_subparsers = settings_parser.add_subparsers(dest="settings_command", required=True)
-    settings_status = settings_subparsers.add_parser("status", help="Show current settings readiness.")
+    settings_status = settings_subparsers.add_parser(
+        "status", help="Show current settings readiness."
+    )
     settings_status.add_argument("--json", action="store_true")
-    settings_save = settings_subparsers.add_parser("save", help="Save Hugging Face token and terms confirmation.")
+    settings_save = settings_subparsers.add_parser(
+        "save", help="Save Hugging Face token and terms confirmation."
+    )
     settings_save.add_argument("--token", type=str, required=False)
     settings_save.add_argument("--terms-confirmed", action="store_true")
     settings_save.add_argument("--json", action="store_true")
@@ -39,9 +48,13 @@ def parse_args() -> argparse.Namespace:
     jobs_show = jobs_subparsers.add_parser("show", help="Show one run request/status/result.")
     jobs_show.add_argument("--job-id", type=str, required=True)
     jobs_show.add_argument("--json", action="store_true")
-    jobs_create = jobs_subparsers.add_parser("create", help="Create a job from files, directories, or configured source roots.")
+    jobs_create = jobs_subparsers.add_parser(
+        "create", help="Create a job from files, directories, or configured source roots."
+    )
     jobs_create.add_argument("--file", dest="files", action="append", type=Path, default=[])
-    jobs_create.add_argument("--directory", dest="directories", action="append", type=Path, default=[])
+    jobs_create.add_argument(
+        "--directory", dest="directories", action="append", type=Path, default=[]
+    )
     jobs_create.add_argument("--source-id", dest="source_ids", action="append", default=[])
     jobs_create.add_argument("--output-root-id", type=str, default="runs")
     jobs_create.add_argument("--reprocess-duplicates", action="store_true")
@@ -51,7 +64,9 @@ def parse_args() -> argparse.Namespace:
     jobs_run.add_argument("--job-id", type=str, required=True)
     jobs_run.add_argument("--json", action="store_true")
 
-    scan_parser = subparsers.add_parser("scan", help="Scan configured source directories for videos.")
+    scan_parser = subparsers.add_parser(
+        "scan", help="Scan configured source directories for videos."
+    )
     scan_parser.add_argument("--config", type=Path, required=False)
     scan_parser.add_argument("--output", type=Path, required=False)
 
@@ -63,7 +78,9 @@ def parse_args() -> argparse.Namespace:
     run_parser = subparsers.add_parser("run-job", help="Run one specific job directory.")
     run_parser.add_argument("--job-dir", type=Path, required=True)
 
-    daemon_parser = subparsers.add_parser("daemon", help="Poll output roots and process pending jobs.")
+    daemon_parser = subparsers.add_parser(
+        "daemon", help="Poll output roots and process pending jobs."
+    )
     daemon_parser.add_argument("--poll-interval", type=int, default=5)
 
     return parser.parse_args()
@@ -87,7 +104,9 @@ def _runtime_config() -> AppConfig:
             for row in defaults.get("inputRoots", [])
             if row.get("enabled", True) and row.get("path")
         ],
-        output_root=str(defaults.get("outputRoots", [{}])[0].get("path") or "/shared/outputs/default"),
+        output_root=str(
+            defaults.get("outputRoots", [{}])[0].get("path") or "/shared/outputs/default"
+        ),
         video_extensions=[str(ext) for ext in defaults.get("videoExtensions", [])],
         change_detection=ChangeDetectionConfig(),
         ocr_policy=OcrPolicy(),
@@ -180,9 +199,15 @@ def cmd_jobs_show(job_id: str, as_json: bool) -> int:
     payload = {
         "job_id": job_id,
         "run_dir": str(run_dir),
-        "request": json.loads((run_dir / "request.json").read_text(encoding="utf-8-sig", errors="replace")),
-        "status": json.loads((run_dir / "status.json").read_text(encoding="utf-8-sig", errors="replace")),
-        "result": json.loads((run_dir / "result.json").read_text(encoding="utf-8-sig", errors="replace")),
+        "request": json.loads(
+            (run_dir / "request.json").read_text(encoding="utf-8-sig", errors="replace")
+        ),
+        "status": json.loads(
+            (run_dir / "status.json").read_text(encoding="utf-8-sig", errors="replace")
+        ),
+        "result": json.loads(
+            (run_dir / "result.json").read_text(encoding="utf-8-sig", errors="replace")
+        ),
     }
     _print_payload(payload, as_json)
     return 0
@@ -231,8 +256,12 @@ def cmd_jobs_create(
         from .processor import process_job
 
         process_job(run_dir)
-        status = json.loads((run_dir / "status.json").read_text(encoding="utf-8-sig", errors="replace"))
-        result = json.loads((run_dir / "result.json").read_text(encoding="utf-8-sig", errors="replace"))
+        status = json.loads(
+            (run_dir / "status.json").read_text(encoding="utf-8-sig", errors="replace")
+        )
+        result = json.loads(
+            (run_dir / "result.json").read_text(encoding="utf-8-sig", errors="replace")
+        )
         payload["state"] = status.get("state", "unknown")
         payload["status"] = status
         payload["result"] = result
@@ -249,8 +278,12 @@ def cmd_jobs_run(job_id: str, as_json: bool) -> int:
     payload = {
         "job_id": job_id,
         "run_dir": str(run_dir),
-        "status": json.loads((run_dir / "status.json").read_text(encoding="utf-8-sig", errors="replace")),
-        "result": json.loads((run_dir / "result.json").read_text(encoding="utf-8-sig", errors="replace")),
+        "status": json.loads(
+            (run_dir / "status.json").read_text(encoding="utf-8-sig", errors="replace")
+        ),
+        "result": json.loads(
+            (run_dir / "result.json").read_text(encoding="utf-8-sig", errors="replace")
+        ),
     }
     _print_payload(payload, as_json)
     return 0

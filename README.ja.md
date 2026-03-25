@@ -266,6 +266,12 @@ python -m unittest discover C:\apps\video2timeline\worker\tests
 C:\apps\video2timeline\scripts\test-e2e.ps1
 ```
 
+commit 時に lint を自動実行したい場合:
+
+```powershell
+git config core.hooksPath .githooks
+```
+
 現在の Playwright smoke では次を見ています。
 
 - ルートから設定必須フローへ遷移すること

@@ -76,7 +76,9 @@ def render_timeline(
                 )
                 last_screen_index = note["index"]
             else:
-                lines.extend(["Screen:", "大きな画面変化はありません。", "", "Screen change:", "省略", ""])
+                lines.extend(
+                    ["Screen:", "大きな画面変化はありません。", "", "Screen change:", "省略", ""]
+                )
     else:
         lines.extend(["_No transcript segments generated._", ""])
         for note in screen_notes:

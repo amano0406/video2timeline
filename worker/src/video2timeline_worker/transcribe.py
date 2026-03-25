@@ -79,7 +79,9 @@ def _build_records(
     return records
 
 
-def _render_markdown(source_name: str, metadata: dict[str, Any], segments: list[SegmentRecord]) -> str:
+def _render_markdown(
+    source_name: str, metadata: dict[str, Any], segments: list[SegmentRecord]
+) -> str:
     lines = [
         f"# Transcript: {source_name}",
         "",
@@ -140,7 +142,9 @@ def transcribe_audio(
             "speaker_turns": [],
         }
         transcript_dir.mkdir(parents=True, exist_ok=True)
-        (transcript_dir / "raw.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        (transcript_dir / "raw.json").write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
         write_text(transcript_dir / "raw.md", _render_markdown(source_name, payload, []))
         return payload
 
@@ -153,12 +157,16 @@ def transcribe_audio(
     model_name = "medium"
     language = "ja"
     try:
-        model = whisperx.load_model(model_name, device, compute_type=compute_type, language=language)
+        model = whisperx.load_model(
+            model_name, device, compute_type=compute_type, language=language
+        )
     except Exception:
         if device == "cuda":
             compute_type = "int8_float16"
             batch_size = 8
-            model = whisperx.load_model(model_name, device, compute_type=compute_type, language=language)
+            model = whisperx.load_model(
+                model_name, device, compute_type=compute_type, language=language
+            )
         else:
             raise
     audio = whisperx.load_audio(str(trimmed_audio_path))
@@ -222,7 +230,9 @@ def transcribe_audio(
         "speaker_turns": diarization_rows or [],
     }
     transcript_dir.mkdir(parents=True, exist_ok=True)
-    (transcript_dir / "raw.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    (transcript_dir / "raw.json").write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     write_text(transcript_dir / "raw.md", _render_markdown(source_name, payload, records))
     del model
     gc.collect()

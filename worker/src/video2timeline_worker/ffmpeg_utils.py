@@ -88,7 +88,9 @@ def _merge_intervals(intervals: list[tuple[float, float]]) -> list[tuple[float, 
     return merged
 
 
-def _invert_intervals(duration: float, silences: list[tuple[float, float]], padding: float) -> list[tuple[float, float]]:
+def _invert_intervals(
+    duration: float, silences: list[tuple[float, float]], padding: float
+) -> list[tuple[float, float]]:
     if duration <= 0:
         return []
     merged = _merge_intervals(silences)
@@ -107,7 +109,9 @@ def _invert_intervals(duration: float, silences: list[tuple[float, float]], padd
     return keep
 
 
-def trim_audio(input_path: Path, output_path: Path, duration_seconds: float) -> list[dict[str, float]]:
+def trim_audio(
+    input_path: Path, output_path: Path, duration_seconds: float
+) -> list[dict[str, float]]:
     ensure_dir(output_path.parent)
     detected = run_command(
         [
@@ -124,7 +128,11 @@ def trim_audio(input_path: Path, output_path: Path, duration_seconds: float) -> 
     )
     silences = _parse_silencedetect((detected.stderr or "") + "\n" + (detected.stdout or ""))
     keep_intervals = _invert_intervals(duration_seconds, silences, padding=1.0)
-    if len(keep_intervals) == 1 and abs(keep_intervals[0][0]) < 0.001 and abs(keep_intervals[0][1] - duration_seconds) < 0.001:
+    if (
+        len(keep_intervals) == 1
+        and abs(keep_intervals[0][0]) < 0.001
+        and abs(keep_intervals[0][1] - duration_seconds) < 0.001
+    ):
         shutil.copy2(input_path, output_path)
     else:
         filter_parts: list[str] = []

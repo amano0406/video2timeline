@@ -20,8 +20,14 @@ def _allowed_extensions(settings: dict[str, Any]) -> set[str]:
     }
 
 
-def _enabled_output_root(settings: dict[str, Any], output_root_id: str | None = None) -> dict[str, Any]:
-    enabled = [root for root in settings.get("outputRoots", []) if root.get("enabled", True) and root.get("path")]
+def _enabled_output_root(
+    settings: dict[str, Any], output_root_id: str | None = None
+) -> dict[str, Any]:
+    enabled = [
+        root
+        for root in settings.get("outputRoots", [])
+        if root.get("enabled", True) and root.get("path")
+    ]
     if output_root_id:
         for root in enabled:
             if str(root.get("id") or "").lower() == output_root_id.lower():
@@ -33,14 +39,22 @@ def _enabled_output_root(settings: dict[str, Any], output_root_id: str | None = 
 
 
 def _enabled_input_roots(settings: dict[str, Any]) -> list[dict[str, Any]]:
-    return [root for root in settings.get("inputRoots", []) if root.get("enabled", True) and root.get("path")]
+    return [
+        root
+        for root in settings.get("inputRoots", [])
+        if root.get("enabled", True) and root.get("path")
+    ]
 
 
 def _iter_videos(directory: Path, allowed_extensions: set[str]) -> list[Path]:
     if not directory.exists():
         return []
     return sorted(
-        [path for path in directory.rglob("*") if path.is_file() and path.suffix.lower() in allowed_extensions],
+        [
+            path
+            for path in directory.rglob("*")
+            if path.is_file() and path.suffix.lower() in allowed_extensions
+        ],
         key=lambda item: str(item).lower(),
     )
 
@@ -97,14 +111,20 @@ def collect_input_items(
         for row in discovered.get("videos", []):
             source_name = str(row.get("source_name") or "")
             source_root = next(
-                (root for root in _enabled_input_roots(settings) if str(root.get("id") or "").lower() == source_name.lower()),
+                (
+                    root
+                    for root in _enabled_input_roots(settings)
+                    if str(root.get("id") or "").lower() == source_name.lower()
+                ),
                 None,
             )
             if source_root is None:
                 continue
             if source_name.lower() not in selected_ids:
                 continue
-            add_path(Path(str(row["path"])), "mounted_root", str(source_root.get("id") or source_name))
+            add_path(
+                Path(str(row["path"])), "mounted_root", str(source_root.get("id") or source_name)
+            )
 
     return rows
 
@@ -143,14 +163,20 @@ def list_runs(settings: dict[str, Any] | None = None) -> list[dict[str, Any]]:
                     "updated_at": status.get("updated_at"),
                     "created_at": request.get("created_at"),
                     "total_size_bytes": sum(int(item.get("size_bytes", 0)) for item in items),
-                    "total_duration_sec": sum(float(item.get("duration_seconds", 0.0)) for item in items),
+                    "total_duration_sec": sum(
+                        float(item.get("duration_seconds", 0.0)) for item in items
+                    ),
                 }
             )
     return rows
 
 
 def _enabled_output_root_list(settings: dict[str, Any]) -> list[dict[str, Any]]:
-    return [root for root in settings.get("outputRoots", []) if root.get("enabled", True) and root.get("path")]
+    return [
+        root
+        for root in settings.get("outputRoots", [])
+        if root.get("enabled", True) and root.get("path")
+    ]
 
 
 def get_active_run(settings: dict[str, Any] | None = None) -> dict[str, Any] | None:
@@ -226,12 +252,22 @@ def create_job(
         "items": [],
     }
 
-    (run_dir / "request.json").write_text(json.dumps(request.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
-    (run_dir / "status.json").write_text(json.dumps(status.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
-    (run_dir / "result.json").write_text(json.dumps(result.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
-    (run_dir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    (run_dir / "request.json").write_text(
+        json.dumps(request.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    (run_dir / "status.json").write_text(
+        json.dumps(status.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    (run_dir / "result.json").write_text(
+        json.dumps(result.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    (run_dir / "manifest.json").write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     write_text(run_dir / "RUN_INFO.md", "# Run Info\n\nPending worker pickup.\n")
-    write_text(run_dir / "TRANSCRIPTION_INFO.md", "# Transcription Info\n\nPending worker pickup.\n")
+    write_text(
+        run_dir / "TRANSCRIPTION_INFO.md", "# Transcription Info\n\nPending worker pickup.\n"
+    )
     write_text(run_dir / "NOTICE.md", "# Notice\n\nPending worker pickup.\n")
 
     return job_id, run_dir

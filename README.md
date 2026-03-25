@@ -267,6 +267,12 @@ Run browser E2E tests:
 C:\apps\video2timeline\scripts\test-e2e.ps1
 ```
 
+Enable commit-time lint checks:
+
+```powershell
+git config core.hooksPath .githooks
+```
+
 The current Playwright smoke suite covers:
 
 - root redirect into the gated job flow

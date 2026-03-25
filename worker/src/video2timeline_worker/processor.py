@@ -78,7 +78,9 @@ def _write_manifest(job_dir: Path, job_id: str, items: list[ManifestItem]) -> No
     write_json_atomic(_manifest_path(job_dir), payload)
 
 
-def _estimate_remaining(total_duration_sec: float, processed_duration_sec: float, elapsed_sec: float) -> float | None:
+def _estimate_remaining(
+    total_duration_sec: float, processed_duration_sec: float, elapsed_sec: float
+) -> float | None:
     if total_duration_sec <= 0 or processed_duration_sec <= 0 or elapsed_sec <= 0:
         return None
     rate = processed_duration_sec / elapsed_sec
@@ -331,7 +333,9 @@ def process_job(job_dir: Path | None = None) -> bool:
         append_log(log_path, f"[{now_iso()}] Starting job {request.job_id}")
         for index, input_item in enumerate(request.input_items, start=1):
             status.current_media = input_item.display_name
-            status.message = f"Preflight {index}/{len(request.input_items)}: {input_item.display_name}"
+            status.message = (
+                f"Preflight {index}/{len(request.input_items)}: {input_item.display_name}"
+            )
             _write_status(job_dir, status)
             source_path = _resolve_input_path(input_item)
             media_probe = probe_video(source_path)
@@ -340,8 +344,15 @@ def process_job(job_dir: Path | None = None) -> bool:
             duplicate_status = "new"
             duplicate_of = None
             if duplicate:
-                duplicate_of = str(duplicate.get("media_id") or duplicate.get("timeline_path") or duplicate.get("run_dir") or "")
-                duplicate_status = "duplicate_reprocess" if request.reprocess_duplicates else "duplicate_skip"
+                duplicate_of = str(
+                    duplicate.get("media_id")
+                    or duplicate.get("timeline_path")
+                    or duplicate.get("run_dir")
+                    or ""
+                )
+                duplicate_status = (
+                    "duplicate_reprocess" if request.reprocess_duplicates else "duplicate_skip"
+                )
 
             manifest_items.append(
                 ManifestItem(
@@ -370,7 +381,9 @@ def process_job(job_dir: Path | None = None) -> bool:
 
         thresholds = ChangeDetectionConfig()
         completed_items: list[ManifestItem] = []
-        for index, (input_item, manifest_item) in enumerate(zip(request.input_items, manifest_items, strict=False), start=1):
+        for index, (input_item, manifest_item) in enumerate(
+            zip(request.input_items, manifest_items, strict=False), start=1
+        ):
             status.current_media = input_item.display_name
             status.current_media_elapsed_sec = 0.0
             status.current_stage = "processing"
@@ -389,7 +402,9 @@ def process_job(job_dir: Path | None = None) -> bool:
             if manifest_item.duplicate_status == "duplicate_skip":
                 manifest_item.status = "skipped_duplicate"
                 status.videos_skipped += 1
-                status.processed_duration_sec = round(status.processed_duration_sec + manifest_item.duration_seconds, 3)
+                status.processed_duration_sec = round(
+                    status.processed_duration_sec + manifest_item.duration_seconds, 3
+                )
                 status.estimated_remaining_sec = _estimate_remaining(
                     status.total_duration_sec,
                     status.processed_duration_sec,
@@ -419,7 +434,13 @@ def process_job(job_dir: Path | None = None) -> bool:
                         "sha256": manifest_item.sha256,
                         "original_path": manifest_item.original_path,
                         "duration_seconds": manifest_item.duration_seconds,
-                        "timeline_path": str(job_dir / "media" / str(manifest_item.media_id) / "timeline" / "timeline.md"),
+                        "timeline_path": str(
+                            job_dir
+                            / "media"
+                            / str(manifest_item.media_id)
+                            / "timeline"
+                            / "timeline.md"
+                        ),
                         "created_at": now_iso(),
                     }
                 )
@@ -432,7 +453,9 @@ def process_job(job_dir: Path | None = None) -> bool:
                 append_log(log_path, f"[{now_iso()}] Failed: {input_item.original_path}")
                 append_log(log_path, traceback.format_exc())
 
-            status.processed_duration_sec = round(status.processed_duration_sec + manifest_item.duration_seconds, 3)
+            status.processed_duration_sec = round(
+                status.processed_duration_sec + manifest_item.duration_seconds, 3
+            )
             status.current_media_elapsed_sec = round(monotonic() - item_started, 3)
             status.estimated_remaining_sec = _estimate_remaining(
                 status.total_duration_sec,
@@ -470,7 +493,10 @@ def process_job(job_dir: Path | None = None) -> bool:
         status.estimated_remaining_sec = 0.0
         status.completed_at = now_iso()
         _write_status(job_dir, status)
-        append_log(log_path, f"[{now_iso()}] Job completed with {status.videos_done} processed, {status.videos_skipped} skipped, {status.videos_failed} failed.")
+        append_log(
+            log_path,
+            f"[{now_iso()}] Job completed with {status.videos_done} processed, {status.videos_skipped} skipped, {status.videos_failed} failed.",
+        )
         return True
     except Exception as exc:
         append_log(log_path, f"[{now_iso()}] Job failed: {exc}")

@@ -7,7 +7,12 @@ import unittest
 from contextlib import contextmanager
 from pathlib import Path
 
-from video2timeline_worker.job_store import collect_input_items, create_job, list_runs, settings_snapshot
+from video2timeline_worker.job_store import (
+    collect_input_items,
+    create_job,
+    list_runs,
+    settings_snapshot,
+)
 from video2timeline_worker.settings import save_huggingface_token, save_settings
 
 

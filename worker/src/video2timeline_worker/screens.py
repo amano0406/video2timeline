@@ -36,7 +36,10 @@ def _load_ocr_components() -> tuple[Any | None, Any | None]:
     use_gpu = False
     try:
         import torch
-        use_gpu = str(settings.get("computeMode") or "cpu").lower() == "gpu" and torch.cuda.is_available()
+
+        use_gpu = (
+            str(settings.get("computeMode") or "cpu").lower() == "gpu" and torch.cuda.is_available()
+        )
     except Exception:
         use_gpu = False
 
@@ -190,11 +193,13 @@ def extract_screens(
         previous_timestamp = timestamp
 
     (screen_dir / "screenshots.jsonl").write_text(
-        "\n".join(json.dumps(row, ensure_ascii=False) for row in frame_rows) + ("\n" if frame_rows else ""),
+        "\n".join(json.dumps(row, ensure_ascii=False) for row in frame_rows)
+        + ("\n" if frame_rows else ""),
         encoding="utf-8",
     )
     (screen_dir / "screen_diff.jsonl").write_text(
-        "\n".join(json.dumps(row, ensure_ascii=False) for row in diff_rows) + ("\n" if diff_rows else ""),
+        "\n".join(json.dumps(row, ensure_ascii=False) for row in diff_rows)
+        + ("\n" if diff_rows else ""),
         encoding="utf-8",
     )
     return frame_rows, diff_rows
