@@ -91,6 +91,12 @@ Screen change:
 - 話者分離は Hugging Face token と gated model 承認が揃っている場合のみ有効です。
 - GUI は保守的な設計で、同時に 1 ジョブだけ動かす前提です。
 
+## インターフェース
+
+- 通常利用では GUI を主入口として想定しています。
+- 追加で、power user や自動化向けに worker 側 CLI も利用できます。
+- GUI と CLI は同じ run ディレクトリ契約 (`request.json`, `status.json`, `result.json`, `timeline.md`, `batch-*.md`) を使います。
+
 ## 必要環境
 
 - Windows または macOS
@@ -116,7 +122,7 @@ macOS:
 起動後は次の順番です。
 
 1. `http://localhost:38090` を開く
-2. `Settings` で Hugging Face token を保存する
+2. 最初に `Settings` を完了する
 3. 必要ならモデル承認ページを開いて承認する
 4. ファイルまたはディレクトリを選ぶ
 5. ジョブを開始する
@@ -143,7 +149,7 @@ C:\apps\video2timeline\stop.bat
 
 ## 多言語対応
 
-ヘッダーから UI 言語を切り替えられます。
+サイドバーの言語切り替えから UI 言語を変更できます。
 
 現在の対応ロケール:
 
@@ -158,6 +164,27 @@ C:\apps\video2timeline\stop.bat
 - `pt`
 
 可能な場合はブラウザ言語を既定値に使い、手動選択は cookie に保存します。地域別のマッピングは [web/Resources/Locales/languages.json](web/Resources/Locales/languages.json) に定義しています。
+
+## CLI
+
+worker 側には、直接ローカル実行や自動化に使える CLI も入っています。
+
+現在の主なコマンド:
+
+- `scan`
+- `compare-images`
+- `run-job`
+- `daemon`
+
+例:
+
+```powershell
+$env:PYTHONPATH="C:\apps\video2timeline\worker\src"
+python -m video2timeline_worker scan
+python -m video2timeline_worker run-job --job-dir C:\path\to\run-YYYYMMDD-HHMMSS-xxxx
+```
+
+公開向けの主入口はあくまで GUI です。CLI はスクリプト実行、デバッグ、自動化用途を主に想定しています。
 
 ## 出力構成
 

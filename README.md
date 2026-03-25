@@ -93,6 +93,12 @@ Omitted.
 - Diarization runs only when the required Hugging Face token and gated-model approval are available.
 - The current GUI is intentionally conservative and runs one active job at a time.
 
+## Interfaces
+
+- GUI is the primary interface for normal use.
+- A worker-side CLI is also available for power users and automation.
+- GUI and CLI both produce the same run-directory artifacts (`request.json`, `status.json`, `result.json`, `timeline.md`, `batch-*.md`).
+
 ## Requirements
 
 - Windows or macOS
@@ -120,7 +126,7 @@ Then:
 1. `start.bat` / `start.command` creates `.env` automatically if it does not exist
 2. set your input and output paths in `.env`
 3. open `http://localhost:38090`
-4. go to `Settings`
+4. complete `Settings` first
 5. save your Hugging Face token if you want diarization
 6. approve the required model page
 7. upload files or choose a directory
@@ -156,7 +162,7 @@ Actual decoding depends on the `ffmpeg` build available in the runtime image.
 
 ## Localization
 
-The UI header includes a language switcher.
+The UI shell includes a language switcher in the sidebar.
 
 Current supported locales:
 
@@ -171,6 +177,27 @@ Current supported locales:
 - `pt`
 
 Browser language is used as the default when possible. Manual selection is stored in a cookie. Supported language aliases and regional mappings are defined in [web/Resources/Locales/languages.json](web/Resources/Locales/languages.json).
+
+## CLI
+
+The repository also includes a worker CLI for direct local execution and automation.
+
+Current commands include:
+
+- `scan`
+- `compare-images`
+- `run-job`
+- `daemon`
+
+Example:
+
+```powershell
+$env:PYTHONPATH="C:\apps\video2timeline\worker\src"
+python -m video2timeline_worker scan
+python -m video2timeline_worker run-job --job-dir C:\path\to\run-YYYYMMDD-HHMMSS-xxxx
+```
+
+The GUI remains the recommended public entry point. The CLI is intended for scripting, debugging, and power-user workflows.
 
 ## Output Layout
 
