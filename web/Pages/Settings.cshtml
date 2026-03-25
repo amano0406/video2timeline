@@ -187,10 +187,11 @@
                                 <span class="block text-xs text-slate-500">@L("settings.compute_mode.cpu_note")</span>
                             </span>
                         </label>
-                        <label class="flex items-start gap-3 rounded-[18px] border border-slate-200 bg-white/70 px-4 py-4 text-sm text-slate-700">
+                        <label class="flex items-start gap-3 rounded-[18px] border border-slate-200 bg-white/70 px-4 py-4 text-sm text-slate-700 @(!Model.WorkerCapability.GpuAvailable ? "opacity-60 cursor-not-allowed" : "")">
                             <input asp-for="ComputeMode"
                                    type="radio"
                                    value="gpu"
+                                   disabled="@(!Model.WorkerCapability.GpuAvailable)"
                                    class="mt-1 h-4 w-4 border-slate-300 text-slate-900" />
                             <span>
                                 <span class="block font-medium text-slate-900">@L("settings.compute_mode.gpu")</span>

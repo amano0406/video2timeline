@@ -111,6 +111,10 @@ public sealed class SettingsModel(
         Token = await settingsStore.ReadTokenAsync(cancellationToken) ?? "";
         var settings = await settingsStore.LoadAsync(cancellationToken);
         ComputeMode = settings.ComputeMode;
+        if (!WorkerCapability.GpuAvailable && string.Equals(ComputeMode, "gpu", StringComparison.OrdinalIgnoreCase))
+        {
+            ComputeMode = "cpu";
+        }
         UiLanguage = languageService.Normalize(settings.UiLanguage) ?? "en";
         StatusMessage ??= TempData["StatusMessage"] as string;
     }
