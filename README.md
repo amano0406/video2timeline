@@ -87,7 +87,7 @@ Omitted.
 ## Key Behavior
 
 - Local-first. No cloud transcription is required for the normal path.
-- CPU-first today. GPU engine support is planned and will be published soon.
+- CPU and GPU modes are both available. GPU mode is faster when the worker has NVIDIA Docker GPU access.
 - Silence trimming is an internal optimization. Final timelines stay aligned to original video time.
 - OCR and image notes are emitted only when screen changes are meaningful enough to matter.
 - Diarization runs only when the required Hugging Face token and gated-model approval are available.
@@ -106,6 +106,7 @@ Omitted.
 - internet access on first run for image and model downloads
 - optional Hugging Face token if you want `pyannote` diarization
 - acceptance of the required gated-model terms for `pyannote`
+- NVIDIA GPU + Docker GPU support if you want GPU mode
 
 ## Quick Start
 
@@ -127,11 +128,12 @@ Then:
 2. set your input and output paths in `.env`
 3. open `http://localhost:38090`
 4. complete `Settings` first
-5. save your Hugging Face token if you want diarization
-6. approve the required model page
-7. upload files or choose a directory
-8. start a job
-9. download the completed ZIP package
+5. choose `CPU` or `GPU` mode in `Settings`
+6. save your Hugging Face token if you want diarization
+7. approve the required model page
+8. upload files or choose a directory
+9. start a job
+10. download the completed ZIP package
 
 The start script also checks:
 
@@ -140,6 +142,7 @@ The start script also checks:
 - whether `.env` still contains placeholder paths
 - whether `web` and `worker` both reach a running state
 - whether the local web UI responds before the browser is opened
+- whether an NVIDIA GPU is present, and if so, it starts the worker with GPU access enabled
 
 Stop:
 
@@ -184,6 +187,12 @@ The repository also includes a worker CLI for direct local execution and automat
 
 Current commands include:
 
+- `settings status`
+- `settings save`
+- `jobs create`
+- `jobs list`
+- `jobs show`
+- `jobs run`
 - `scan`
 - `compare-images`
 - `run-job`
@@ -193,11 +202,15 @@ Example:
 
 ```powershell
 $env:PYTHONPATH="C:\apps\video2timeline\worker\src"
-python -m video2timeline_worker scan
-python -m video2timeline_worker run-job --job-dir C:\path\to\run-YYYYMMDD-HHMMSS-xxxx
+python -m video2timeline_worker settings status
+python -m video2timeline_worker settings save --token hf_xxx --terms-confirmed
+python -m video2timeline_worker jobs create --file C:\path\to\clip.mp4
+python -m video2timeline_worker jobs create --directory C:\path\to\folder
+python -m video2timeline_worker jobs create --source-id primary
+python -m video2timeline_worker jobs list
 ```
 
-The GUI remains the recommended public entry point. The CLI is intended for scripting, debugging, and power-user workflows.
+The GUI remains the recommended public entry point. The CLI can create and run the same job contract directly from local files, directories, or configured source roots, and is intended for scripting, debugging, and power-user workflows.
 
 ## Output Layout
 
@@ -273,4 +286,4 @@ Third-party code and runtime notes:
 
 ## Status
 
-`video2timeline` v1 is stable for CPU-first local processing. GPU engine support is not part of the public release yet and is planned as a future update.
+`video2timeline` v1 is stable for local processing. In this development environment, GPU execution was verified on `NVIDIA GeForce RTX 4070`, driver `560.94`, with Docker GPU access available.

@@ -22,6 +22,9 @@ public sealed class SettingsModel(
     [BindProperty]
     public bool TermsConfirmed { get; set; }
 
+    [BindProperty]
+    public string ComputeMode { get; set; } = "cpu";
+
     public string? StatusMessage { get; private set; }
 
     public string TokenSettingsUrl => "https://huggingface.co/settings/tokens";
@@ -58,6 +61,10 @@ public sealed class SettingsModel(
             TermsConfirmed,
             cancellationToken);
 
+        var settings = await settingsStore.LoadAsync(cancellationToken);
+        settings.ComputeMode = ComputeMode;
+        await settingsStore.SaveAsync(settings, cancellationToken: cancellationToken);
+
         await LoadPageAsync(cancellationToken);
         if (SetupState.IsReady)
         {
@@ -75,6 +82,8 @@ public sealed class SettingsModel(
         SetupState = await setupStateService.GetAsync(cancellationToken);
         TermsConfirmed = SetupState.TermsConfirmed;
         Token = await settingsStore.ReadTokenAsync(cancellationToken) ?? "";
+        var settings = await settingsStore.LoadAsync(cancellationToken);
+        ComputeMode = settings.ComputeMode;
     }
 
     private string L(string key) => localizer.Get(languageService.Resolve(Request), key);

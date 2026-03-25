@@ -33,6 +33,9 @@ public sealed class AppSettingsDocument
 
     [JsonPropertyName("huggingfaceTermsConfirmed")]
     public bool HuggingfaceTermsConfirmed { get; set; }
+
+    [JsonPropertyName("computeMode")]
+    public string ComputeMode { get; set; } = "cpu";
 }
 
 public sealed class UploadedFileReference

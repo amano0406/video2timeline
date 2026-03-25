@@ -88,6 +88,9 @@ def _render_markdown(source_name: str, metadata: dict[str, Any], segments: list[
         f"- Model: `{metadata['model']}`",
         f"- Language: `{metadata['language']}`",
         f"- Device: `{metadata['device']}`",
+        f"- Requested compute mode: `{metadata.get('requested_compute_mode', 'cpu')}`",
+        f"- Effective compute mode: `{metadata.get('effective_compute_mode', metadata['device'])}`",
+        f"- GPU available: `{metadata.get('gpu_available', False)}`",
         f"- Compute type: `{metadata['compute_type']}`",
         f"- Alignment used: `{metadata['alignment_used']}`",
         f"- Diarization used: `{metadata['diarization_used']}`",
@@ -141,13 +144,25 @@ def transcribe_audio(
         write_text(transcript_dir / "raw.md", _render_markdown(source_name, payload, []))
         return payload
 
-    device = "cpu"
-    compute_type = "int8"
+    requested_compute_mode = str(settings.get("computeMode") or "cpu").lower()
+    gpu_available = torch.cuda.is_available()
+    device = "cuda" if requested_compute_mode == "gpu" and gpu_available else "cpu"
+    effective_compute_mode = "gpu" if device == "cuda" else "cpu"
+    compute_type = "float16" if device == "cuda" else "int8"
+    batch_size = 16 if device == "cuda" else 8
     model_name = "medium"
     language = "ja"
-    model = whisperx.load_model(model_name, device, compute_type=compute_type, language=language)
+    try:
+        model = whisperx.load_model(model_name, device, compute_type=compute_type, language=language)
+    except Exception:
+        if device == "cuda":
+            compute_type = "int8_float16"
+            batch_size = 8
+            model = whisperx.load_model(model_name, device, compute_type=compute_type, language=language)
+        else:
+            raise
     audio = whisperx.load_audio(str(trimmed_audio_path))
-    result = model.transcribe(audio, batch_size=8, language=language)
+    result = model.transcribe(audio, batch_size=batch_size, language=language)
     aligned_segments = result.get("segments", [])
     alignment_used = False
     try:
@@ -170,7 +185,7 @@ def transcribe_audio(
     diarization_error: str | None = None
     if token and terms_confirmed:
         try:
-            diarizer = DiarizationPipeline(token=token, device=device)
+            diarizer = DiarizationPipeline(token=token, device=torch.device(device))
             diarization_df = diarizer(audio)
             diarization_rows = [
                 {
@@ -195,6 +210,9 @@ def transcribe_audio(
         "generated_at": now_iso(),
         "model": model_name,
         "device": device,
+        "requested_compute_mode": requested_compute_mode,
+        "effective_compute_mode": effective_compute_mode,
+        "gpu_available": gpu_available,
         "compute_type": compute_type,
         "language": language,
         "alignment_used": alignment_used,

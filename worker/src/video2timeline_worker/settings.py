@@ -35,15 +35,21 @@ def token_path() -> Path:
 
 def load_settings() -> dict[str, Any]:
     if settings_path().exists():
-        return json.loads(settings_path().read_text(encoding="utf-8"))
-    defaults = load_runtime_defaults()
-    return {
-        "schemaVersion": 1,
-        "inputRoots": defaults.get("inputRoots", []),
-        "outputRoots": defaults.get("outputRoots", []),
-        "videoExtensions": defaults.get("videoExtensions", []),
-        "huggingfaceTermsConfirmed": False,
-    }
+        payload = json.loads(settings_path().read_text(encoding="utf-8"))
+    else:
+        defaults = load_runtime_defaults()
+        payload = {
+            "schemaVersion": 1,
+            "inputRoots": defaults.get("inputRoots", []),
+            "outputRoots": defaults.get("outputRoots", []),
+            "videoExtensions": defaults.get("videoExtensions", []),
+            "huggingfaceTermsConfirmed": False,
+            "computeMode": "cpu",
+        }
+    payload["computeMode"] = str(payload.get("computeMode") or "cpu").strip().lower()
+    if payload["computeMode"] not in {"cpu", "gpu"}:
+        payload["computeMode"] = "cpu"
+    return payload
 
 
 def load_huggingface_token() -> str | None:
@@ -52,3 +58,18 @@ def load_huggingface_token() -> str | None:
         return None
     value = path.read_text(encoding="utf-8", errors="replace").strip()
     return value or None
+
+
+def save_settings(payload: dict[str, Any]) -> None:
+    settings_path().parent.mkdir(parents=True, exist_ok=True)
+    settings_path().write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def save_huggingface_token(token: str | None) -> None:
+    path = token_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if token and token.strip():
+        path.write_text(token.strip(), encoding="utf-8")
+        return
+    if path.exists():
+        path.unlink()

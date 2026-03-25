@@ -117,6 +117,12 @@ public sealed class SettingsStore(AppPaths paths)
             value.OutputRoots[0].Enabled = true;
         }
 
+        value.ComputeMode = value.ComputeMode?.Trim().ToLowerInvariant() switch
+        {
+            "gpu" => "gpu",
+            _ => "cpu",
+        };
+
         return value;
     }
 }

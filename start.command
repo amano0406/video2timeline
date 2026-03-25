@@ -75,7 +75,12 @@ validate_input_path "VIDEO_SOURCE_2" "$VIDEO_SOURCE_2"
 validate_output_path "VIDEO_OUTPUT_ROOT" "$VIDEO_OUTPUT_ROOT"
 
 echo "Starting web and worker containers..."
-docker compose up --build -d
+compose_args=(-f docker-compose.yml)
+if command -v nvidia-smi >/dev/null 2>&1; then
+  compose_args+=(-f docker-compose.gpu.yml)
+  echo "NVIDIA GPU detected. Starting worker with GPU support enabled."
+fi
+docker compose "${compose_args[@]}" up --build -d
 
 echo "Waiting for containers and web health check..."
 for _ in $(seq 1 45); do

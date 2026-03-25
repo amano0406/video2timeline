@@ -7,6 +7,7 @@ from typing import Any
 from .config import ChangeDetectionConfig
 from .ffmpeg_utils import extract_frame
 from .fs_utils import ensure_dir
+from .settings import load_settings
 
 
 def candidate_timestamps(duration_seconds: float) -> list[float]:
@@ -31,6 +32,14 @@ def candidate_timestamps(duration_seconds: float) -> list[float]:
 
 
 def _load_ocr_components() -> tuple[Any | None, Any | None]:
+    settings = load_settings()
+    use_gpu = False
+    try:
+        import torch
+        use_gpu = str(settings.get("computeMode") or "cpu").lower() == "gpu" and torch.cuda.is_available()
+    except Exception:
+        use_gpu = False
+
     try:
         import easyocr
     except Exception:
@@ -41,12 +50,12 @@ def _load_ocr_components() -> tuple[Any | None, Any | None]:
     except Exception:
         pipeline = None
 
-    reader = easyocr.Reader(["ja", "en"], gpu=False, verbose=False) if easyocr else None
+    reader = easyocr.Reader(["ja", "en"], gpu=use_gpu, verbose=False) if easyocr else None
     captioner = (
         pipeline(
             "image-to-text",
             model="florence-community/Florence-2-base",
-            device=-1,
+            device=0 if use_gpu else -1,
         )
         if pipeline
         else None

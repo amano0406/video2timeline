@@ -6,13 +6,50 @@ import time
 from pathlib import Path
 
 from .config import AppConfig, ChangeDetectionConfig, OcrPolicy, SourceDirectory, load_config
+from .contracts import JobRequest
 from .discovery import discover_videos
-from .settings import load_runtime_defaults
+from .job_store import (
+    collect_input_items,
+    create_job,
+    find_run_dir,
+    get_active_run,
+    list_runs,
+    settings_snapshot,
+)
+from .settings import load_huggingface_token, load_runtime_defaults, load_settings, save_huggingface_token, save_settings
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="video2timeline worker")
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    settings_parser = subparsers.add_parser("settings", help="Show or update local settings.")
+    settings_subparsers = settings_parser.add_subparsers(dest="settings_command", required=True)
+    settings_status = settings_subparsers.add_parser("status", help="Show current settings readiness.")
+    settings_status.add_argument("--json", action="store_true")
+    settings_save = settings_subparsers.add_parser("save", help="Save Hugging Face token and terms confirmation.")
+    settings_save.add_argument("--token", type=str, required=False)
+    settings_save.add_argument("--terms-confirmed", action="store_true")
+    settings_save.add_argument("--json", action="store_true")
+
+    jobs_parser = subparsers.add_parser("jobs", help="Create or inspect jobs.")
+    jobs_subparsers = jobs_parser.add_subparsers(dest="jobs_command", required=True)
+    jobs_list = jobs_subparsers.add_parser("list", help="List runs in the configured output root.")
+    jobs_list.add_argument("--json", action="store_true")
+    jobs_show = jobs_subparsers.add_parser("show", help="Show one run request/status/result.")
+    jobs_show.add_argument("--job-id", type=str, required=True)
+    jobs_show.add_argument("--json", action="store_true")
+    jobs_create = jobs_subparsers.add_parser("create", help="Create a job from files, directories, or configured source roots.")
+    jobs_create.add_argument("--file", dest="files", action="append", type=Path, default=[])
+    jobs_create.add_argument("--directory", dest="directories", action="append", type=Path, default=[])
+    jobs_create.add_argument("--source-id", dest="source_ids", action="append", default=[])
+    jobs_create.add_argument("--output-root-id", type=str, default="runs")
+    jobs_create.add_argument("--reprocess-duplicates", action="store_true")
+    jobs_create.add_argument("--queue-only", action="store_true")
+    jobs_create.add_argument("--json", action="store_true")
+    jobs_run = jobs_subparsers.add_parser("run", help="Run one existing queued job.")
+    jobs_run.add_argument("--job-id", type=str, required=True)
+    jobs_run.add_argument("--json", action="store_true")
 
     scan_parser = subparsers.add_parser("scan", help="Scan configured source directories for videos.")
     scan_parser.add_argument("--config", type=Path, required=False)
@@ -97,8 +134,153 @@ def cmd_daemon(poll_interval: int) -> int:
     return 0
 
 
+def _print_payload(payload: dict[str, object] | list[dict[str, object]], as_json: bool) -> None:
+    if as_json:
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return
+
+    if isinstance(payload, list):
+        if not payload:
+            print("No jobs found.")
+            return
+        for row in payload:
+            print(
+                f"{row.get('job_id')} | {row.get('state')} | "
+                f"{row.get('videos_done', 0)}/{row.get('videos_total', 0)} | "
+                f"{row.get('current_stage', '')} | {row.get('run_dir', '')}"
+            )
+        return
+
+    for key, value in payload.items():
+        print(f"{key}: {value}")
+
+
+def cmd_settings_status(as_json: bool) -> int:
+    _print_payload(settings_snapshot(), as_json)
+    return 0
+
+
+def cmd_settings_save(token: str | None, terms_confirmed: bool, as_json: bool) -> int:
+    settings = load_settings()
+    if token is not None:
+        save_huggingface_token(token)
+    settings["huggingfaceTermsConfirmed"] = terms_confirmed
+    save_settings(settings)
+    _print_payload(settings_snapshot(settings), as_json)
+    return 0
+
+
+def cmd_jobs_list(as_json: bool) -> int:
+    _print_payload(list_runs(), as_json)
+    return 0
+
+
+def cmd_jobs_show(job_id: str, as_json: bool) -> int:
+    run_dir = find_run_dir(job_id)
+    payload = {
+        "job_id": job_id,
+        "run_dir": str(run_dir),
+        "request": json.loads((run_dir / "request.json").read_text(encoding="utf-8-sig", errors="replace")),
+        "status": json.loads((run_dir / "status.json").read_text(encoding="utf-8-sig", errors="replace")),
+        "result": json.loads((run_dir / "result.json").read_text(encoding="utf-8-sig", errors="replace")),
+    }
+    _print_payload(payload, as_json)
+    return 0
+
+
+def cmd_jobs_create(
+    *,
+    files: list[Path],
+    directories: list[Path],
+    source_ids: list[str],
+    output_root_id: str,
+    reprocess_duplicates: bool,
+    queue_only: bool,
+    as_json: bool,
+) -> int:
+    settings = load_settings()
+    active = get_active_run(settings)
+    if active is not None:
+        raise ValueError(f"Another job is already active: {active['job_id']}")
+
+    input_items = collect_input_items(
+        settings=settings,
+        files=files,
+        directories=directories,
+        source_ids=source_ids,
+    )
+    if not input_items:
+        raise ValueError("No input videos were selected.")
+
+    job_id, run_dir = create_job(
+        settings=settings,
+        input_items=input_items,
+        output_root_id=output_root_id,
+        reprocess_duplicates=reprocess_duplicates,
+    )
+
+    payload: dict[str, object] = {
+        "job_id": job_id,
+        "run_dir": str(run_dir),
+        "state": "pending",
+        "input_count": len(input_items),
+        "queue_only": queue_only,
+    }
+
+    if not queue_only:
+        from .processor import process_job
+
+        process_job(run_dir)
+        status = json.loads((run_dir / "status.json").read_text(encoding="utf-8-sig", errors="replace"))
+        result = json.loads((run_dir / "result.json").read_text(encoding="utf-8-sig", errors="replace"))
+        payload["state"] = status.get("state", "unknown")
+        payload["status"] = status
+        payload["result"] = result
+
+    _print_payload(payload, as_json)
+    return 0
+
+
+def cmd_jobs_run(job_id: str, as_json: bool) -> int:
+    from .processor import process_job
+
+    run_dir = find_run_dir(job_id)
+    process_job(run_dir)
+    payload = {
+        "job_id": job_id,
+        "run_dir": str(run_dir),
+        "status": json.loads((run_dir / "status.json").read_text(encoding="utf-8-sig", errors="replace")),
+        "result": json.loads((run_dir / "result.json").read_text(encoding="utf-8-sig", errors="replace")),
+    }
+    _print_payload(payload, as_json)
+    return 0
+
+
 def main() -> int:
     args = parse_args()
+    if args.command == "settings":
+        if args.settings_command == "status":
+            return cmd_settings_status(args.json)
+        if args.settings_command == "save":
+            token = args.token if args.token is not None else load_huggingface_token()
+            return cmd_settings_save(token, args.terms_confirmed, args.json)
+    if args.command == "jobs":
+        if args.jobs_command == "list":
+            return cmd_jobs_list(args.json)
+        if args.jobs_command == "show":
+            return cmd_jobs_show(args.job_id, args.json)
+        if args.jobs_command == "create":
+            return cmd_jobs_create(
+                files=args.files,
+                directories=args.directories,
+                source_ids=args.source_ids,
+                output_root_id=args.output_root_id,
+                reprocess_duplicates=args.reprocess_duplicates,
+                queue_only=args.queue_only,
+                as_json=args.json,
+            )
+        if args.jobs_command == "run":
+            return cmd_jobs_run(args.job_id, args.json)
     if args.command == "scan":
         return cmd_scan(args.config, args.output)
     if args.command == "compare-images":

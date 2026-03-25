@@ -44,7 +44,13 @@ call :validate_output_path "VIDEO_OUTPUT_ROOT" "!VIDEO_OUTPUT_ROOT!"
 if errorlevel 1 exit /b 1
 
 echo Starting web and worker containers...
-docker compose up --build -d
+set "COMPOSE_GPU_FILE="
+where nvidia-smi >nul 2>&1
+if not errorlevel 1 (
+  set "COMPOSE_GPU_FILE=-f docker-compose.gpu.yml"
+  echo NVIDIA GPU detected. Starting worker with GPU support enabled.
+)
+docker compose -f docker-compose.yml %COMPOSE_GPU_FILE% up --build -d
 if errorlevel 1 (
   echo docker compose failed before the app became ready.
   exit /b 1
