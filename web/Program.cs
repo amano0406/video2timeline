@@ -1,13 +1,39 @@
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http.Features;
 using Video2Timeline.Web.Models;
 using Video2Timeline.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+var appPaths = new AppPaths(builder.Configuration);
+var dataProtectionPath = Path.Combine(appPaths.AppDataRoot, "data-protection");
+const long MaxUploadBytes = 8L * 1024 * 1024 * 1024;
+
+Directory.CreateDirectory(dataProtectionPath);
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = MaxUploadBytes;
+});
 
 builder.Services.AddRazorPages();
-builder.Services.AddSingleton<AppPaths>();
+builder.Services.AddSingleton(appPaths);
+builder.Services.AddSingleton<AppInstanceService>();
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionPath))
+    .SetApplicationName("video2timeline");
+builder.Services.AddAntiforgery(options =>
+{
+    options.Cookie.Name = "video2timeline.antiforgery";
+});
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = MaxUploadBytes;
+});
 builder.Services.AddSingleton<SettingsStore>();
+builder.Services.AddSingleton<SetupStateService>();
 builder.Services.AddSingleton<ScanService>();
 builder.Services.AddSingleton<RunStore>();
+builder.Services.AddSingleton<UploadSessionStore>();
 builder.Services.AddSingleton<LanguageService>();
 builder.Services.AddSingleton<JsonLocalizationService>();
 builder.Services.AddHttpClient<HuggingFaceAccessService>(client =>
@@ -24,6 +50,36 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseRouting();
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path;
+    if (IsStaticAssetRequest(path))
+    {
+        await next();
+        return;
+    }
+
+    var setupStateService = context.RequestServices.GetRequiredService<SetupStateService>();
+    var setupState = await setupStateService.GetAsync(context.RequestAborted);
+    context.Items["SetupState"] = setupState;
+
+    if (setupState.IsReady || IsAllowedWithoutSetup(path))
+    {
+        await next();
+        return;
+    }
+
+    if (path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase))
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        await context.Response.WriteAsJsonAsync(
+            new { error = "Complete settings before using this endpoint." },
+            context.RequestAborted);
+        return;
+    }
+
+    context.Response.Redirect("/settings");
+});
 app.UseAuthorization();
 
 app.MapStaticAssets();
@@ -46,6 +102,64 @@ app.MapPost("/api/uploads", async (HttpRequest request, RunStore runStore, Cance
     var form = await request.ReadFormAsync(cancellationToken);
     var items = await runStore.SaveUploadsAsync(form.Files, cancellationToken);
     return Results.Ok(new { items, total = items.Count });
+});
+
+app.MapPost("/api/uploads/sessions", async (UploadSessionStore uploadSessionStore, CancellationToken cancellationToken) =>
+{
+    var session = await uploadSessionStore.CreateSessionAsync(cancellationToken);
+    return Results.Ok(session);
+});
+
+app.MapPost("/api/uploads/sessions/{sessionId}/files", async (
+    string sessionId,
+    CreateUploadFileRequest request,
+    UploadSessionStore uploadSessionStore,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var created = await uploadSessionStore.RegisterFileAsync(sessionId, request, cancellationToken);
+        return Results.Ok(created);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapPost("/api/uploads/sessions/{sessionId}/files/{fileId}/chunks/{chunkIndex:int}", async (
+    string sessionId,
+    string fileId,
+    int chunkIndex,
+    HttpRequest request,
+    UploadSessionStore uploadSessionStore,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        await uploadSessionStore.AppendChunkAsync(sessionId, fileId, chunkIndex, request.Body, cancellationToken);
+        return Results.Ok(new { uploaded = true, chunkIndex });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapPost("/api/uploads/sessions/{sessionId}/complete", async (
+    string sessionId,
+    UploadSessionStore uploadSessionStore,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var items = await uploadSessionStore.CompleteSessionAsync(sessionId, cancellationToken);
+        return Results.Ok(new { items, total = items.Count });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
 });
 
 app.MapPost("/api/jobs", async (CreateJobCommand command, RunStore runStore, CancellationToken cancellationToken) =>
@@ -95,6 +209,15 @@ app.MapGet("/api/settings/huggingface/status", async (HuggingFaceAccessService a
     return Results.Ok(snapshot);
 });
 
+app.MapGet("/api/app/version", (AppInstanceService appInstanceService) =>
+{
+    return Results.Ok(new
+    {
+        instanceId = appInstanceService.InstanceId,
+        startedAt = appInstanceService.StartedAt,
+    });
+});
+
 app.MapGet("/set-language", (string lang, string? returnUrl, LanguageService languageService, HttpContext httpContext) =>
 {
     languageService.ApplySelection(httpContext.Response, lang);
@@ -108,3 +231,16 @@ app.MapGet("/set-language", (string lang, string? returnUrl, LanguageService lan
 });
 
 app.Run();
+
+static bool IsAllowedWithoutSetup(PathString path) =>
+    path.StartsWithSegments("/settings", StringComparison.OrdinalIgnoreCase) ||
+    path.StartsWithSegments("/set-language", StringComparison.OrdinalIgnoreCase) ||
+    path.StartsWithSegments("/api/settings", StringComparison.OrdinalIgnoreCase) ||
+    path.StartsWithSegments("/Error", StringComparison.OrdinalIgnoreCase);
+
+static bool IsStaticAssetRequest(PathString path) =>
+    Path.HasExtension(path.Value) ||
+    path.StartsWithSegments("/css", StringComparison.OrdinalIgnoreCase) ||
+    path.StartsWithSegments("/js", StringComparison.OrdinalIgnoreCase) ||
+    path.StartsWithSegments("/lib", StringComparison.OrdinalIgnoreCase) ||
+    path.StartsWithSegments("/images", StringComparison.OrdinalIgnoreCase);

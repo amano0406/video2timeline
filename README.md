@@ -6,6 +6,8 @@ Local-first video-to-timeline packaging for ChatGPT and other LLM workflows.
 
 `video2timeline` converts local video files into structured timeline packages that are easy to review, compress, and upload to ChatGPT for downstream analysis.
 
+The primary goal of this project is to make existing video assets usable by LLMs efficiently. In practice, that means turning local video files into structured text-first materials that can be reviewed, zipped, and handed to ChatGPT or other LLM workflows for analysis.
+
 Typical use cases:
 
 - meeting review
@@ -15,17 +17,21 @@ Typical use cases:
 
 ## Screenshots
 
-### Dashboard
-
-![Dashboard](docs/screenshots/dashboard.png)
-
 ### Settings
 
-![Settings](docs/screenshots/settings.png)
+![Settings](docs/screenshots/settings-en.png)
+
+### New Job
+
+![New Job](docs/screenshots/new-job-en.png)
+
+### Jobs
+
+![Jobs](docs/screenshots/jobs-en.png)
 
 ### Run Details
 
-![Run Details](docs/screenshots/run-details.png)
+![Run Details](docs/screenshots/run-details-en.png)
 
 ## What It Produces
 
@@ -111,15 +117,23 @@ macOS:
 
 Then:
 
-1. copy `.env.example` to `.env` if you want to edit mount paths up front
+1. `start.bat` / `start.command` creates `.env` automatically if it does not exist
 2. set your input and output paths in `.env`
-3. open `http://localhost:8090`
+3. open `http://localhost:38090`
 4. go to `Settings`
 5. save your Hugging Face token if you want diarization
 6. approve the required model page
 7. upload files or choose a directory
 8. start a job
 9. download the completed ZIP package
+
+The start script also checks:
+
+- whether Docker Desktop is installed
+- whether the Docker engine is actually running
+- whether `.env` still contains placeholder paths
+- whether `web` and `worker` both reach a running state
+- whether the local web UI responds before the browser is opened
 
 Stop:
 
@@ -215,8 +229,9 @@ C:\apps\video2timeline\scripts\test-e2e.ps1
 
 The current Playwright smoke suite covers:
 
-- dashboard visibility
-- settings flow without a token
+- root redirect into the gated job flow
+- settings page rendering and theme options
+- jobs list rendering with completed runs
 - completed run details
 - ZIP download from a completed run
 

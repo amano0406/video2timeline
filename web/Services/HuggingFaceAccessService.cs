@@ -4,9 +4,10 @@ using Video2Timeline.Web.Models;
 
 namespace Video2Timeline.Web.Services;
 
-public sealed class HuggingFaceAccessService(HttpClient httpClient, SettingsStore settingsStore)
+public sealed class HuggingFaceAccessService(HttpClient httpClient, SettingsStore settingsStore, IConfiguration configuration)
 {
     private const string PyannoteResolveUrl = "https://huggingface.co/pyannote/speaker-diarization-community-1/resolve/main/config.yaml";
+    private readonly string? _overrideState = configuration["VIDEO2TIMELINE_HF_ACCESS_OVERRIDE"];
 
     public async Task<HuggingFaceAccessSnapshot> GetSnapshotAsync(CancellationToken cancellationToken = default)
     {
@@ -17,6 +18,13 @@ public sealed class HuggingFaceAccessService(HttpClient httpClient, SettingsStor
             HasToken = hasToken,
             TermsConfirmed = settings.HuggingfaceTermsConfirmed,
         };
+
+        if (!string.IsNullOrWhiteSpace(_overrideState))
+        {
+            snapshot.AccessState = _overrideState.Trim().ToLowerInvariant();
+            snapshot.AccessMessage = snapshot.AccessState;
+            return snapshot;
+        }
 
         if (!hasToken)
         {

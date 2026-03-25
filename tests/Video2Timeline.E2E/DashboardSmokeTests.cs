@@ -24,28 +24,37 @@ public sealed class DashboardSmokeTests : PageTest
     }
 
     [TestMethod]
-    public async Task Dashboard_ShowsSetupRequirement_AndCompletedRun()
+    public async Task Root_Redirects_To_NewJob()
     {
         await SetLanguageAsync("en", "/");
 
-        await Expect(Page).ToHaveURLAsync(new Regex(".*/$"));
+        await Expect(Page).ToHaveURLAsync(new Regex(".*/jobs/new$"));
         await Expect(Page.Locator("html")).ToHaveAttributeAsync("lang", "en");
-        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Create A New Job" })).ToBeVisibleAsync();
-        await Expect(Page.GetByRole(AriaRole.Link, new() { Name = "Open Settings" })).ToBeVisibleAsync();
-        await Expect(Page.GetByRole(AriaRole.Link, new() { Name = "run-e2e-completed" })).ToBeVisibleAsync();
-        await Expect(Page.GetByRole(AriaRole.Link, new() { Name = "ZIP" })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "New Job" })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Link, new() { Name = "Jobs" })).ToBeVisibleAsync();
     }
 
     [TestMethod]
-    public async Task Settings_CanToggleTerms_WithoutToken()
+    public async Task Settings_Shows_Save_Button_And_Theme_Options()
     {
         await SetLanguageAsync("en", "/settings");
 
         await Expect(Page.Locator("html")).ToHaveAttributeAsync("lang", "en");
-        await Expect(Page.Locator("#token-state")).ToContainTextAsync("Not Saved");
-        await Page.GetByLabel("Save that you confirmed the pyannote gated model terms").CheckAsync();
-        await Expect(Page.Locator("#terms-state")).ToContainTextAsync("Confirmed");
-        await Expect(Page.Locator("#access-state")).ToContainTextAsync("Token is not set.");
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Settings" })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save Settings" })).ToBeVisibleAsync();
+        await Expect(Page.GetByText("Workbench")).ToBeVisibleAsync();
+        await Expect(Page.GetByText("Classic")).ToBeVisibleAsync();
+    }
+
+    [TestMethod]
+    public async Task Jobs_Page_Shows_Completed_Run()
+    {
+        await SetLanguageAsync("en", "/jobs");
+
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Jobs", Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByText("There is no active job right now.")).ToBeVisibleAsync();
+        await Expect(Page.GetByText(_fixture.CompletedJobId)).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Link, new() { Name = "ZIP" })).ToBeVisibleAsync();
     }
 
     [TestMethod]

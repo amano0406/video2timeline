@@ -78,6 +78,7 @@ internal sealed class TestAppFixture : IAsyncDisposable
             runtimeDefaultsPath,
             JsonSerializer.Serialize(CreateRuntimeDefaults(outputRoot), new JsonSerializerOptions { WriteIndented = true }));
 
+        await SeedSettingsAsync(appDataRoot, outputRoot);
         await SeedCompletedRunAsync(outputRoot);
 
         var appDllPath = Path.Combine(repoRoot, "web", "bin", "Debug", "net10.0", "Video2Timeline.Web.dll");
@@ -91,6 +92,7 @@ internal sealed class TestAppFixture : IAsyncDisposable
         startInfo.Environment["VIDEO2TIMELINE_RUNTIME_DEFAULTS"] = runtimeDefaultsPath;
         startInfo.Environment["VIDEO2TIMELINE_APPDATA_ROOT"] = appDataRoot;
         startInfo.Environment["VIDEO2TIMELINE_UPLOADS_ROOT"] = uploadsRoot;
+        startInfo.Environment["VIDEO2TIMELINE_HF_ACCESS_OVERRIDE"] = "authorized";
         startInfo.Environment["ASPNETCORE_ENVIRONMENT"] = "Development";
 
         var process = new Process { StartInfo = startInfo };
@@ -149,6 +151,36 @@ internal sealed class TestAppFixture : IAsyncDisposable
             new { id = "runs", displayName = "Runs", path = outputRoot, enabled = true },
         },
     };
+
+    private static async Task SeedSettingsAsync(string appDataRoot, string outputRoot)
+    {
+        Directory.CreateDirectory(appDataRoot);
+        Directory.CreateDirectory(Path.Combine(appDataRoot, "secrets"));
+
+        var settings = new
+        {
+            schemaVersion = 1,
+            videoExtensions = new[] { ".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm" },
+            inputRoots = new object[]
+            {
+                new { id = "primary", displayName = "Primary Videos", path = "/shared/inputs/primary", enabled = true },
+                new { id = "secondary", displayName = "Secondary Videos", path = "/shared/inputs/secondary", enabled = true },
+                new { id = "uploads", displayName = "Uploaded Files", path = "/shared/uploads", enabled = true },
+            },
+            outputRoots = new object[]
+            {
+                new { id = "runs", displayName = "Runs", path = outputRoot, enabled = true },
+            },
+            huggingfaceTermsConfirmed = true,
+        };
+
+        await File.WriteAllTextAsync(
+            Path.Combine(appDataRoot, "settings.json"),
+            JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true }));
+        await File.WriteAllTextAsync(
+            Path.Combine(appDataRoot, "secrets", "huggingface.token"),
+            "hf_test_token_value");
+    }
 
     private static async Task SeedCompletedRunAsync(string outputRoot)
     {

@@ -50,6 +50,69 @@ public sealed class UploadedFileReference
     public long SizeBytes { get; set; }
 }
 
+public sealed class UploadSessionDocument
+{
+    [JsonPropertyName("sessionId")]
+    public string SessionId { get; set; } = "";
+
+    [JsonPropertyName("createdAt")]
+    public string CreatedAt { get; set; } = "";
+
+    [JsonPropertyName("chunkSizeBytes")]
+    public long ChunkSizeBytes { get; set; }
+
+    [JsonPropertyName("files")]
+    public List<UploadSessionFileDocument> Files { get; set; } = [];
+}
+
+public sealed class UploadSessionFileDocument
+{
+    [JsonPropertyName("fileId")]
+    public string FileId { get; set; } = "";
+
+    [JsonPropertyName("originalName")]
+    public string OriginalName { get; set; } = "";
+
+    [JsonPropertyName("sizeBytes")]
+    public long SizeBytes { get; set; }
+
+    [JsonPropertyName("expectedChunks")]
+    public int ExpectedChunks { get; set; }
+
+    [JsonPropertyName("uploadedChunks")]
+    public int UploadedChunks { get; set; }
+
+    [JsonPropertyName("storedPath")]
+    public string StoredPath { get; set; } = "";
+}
+
+public sealed class CreateUploadSessionResponse
+{
+    [JsonPropertyName("sessionId")]
+    public string SessionId { get; set; } = "";
+
+    [JsonPropertyName("chunkSizeBytes")]
+    public long ChunkSizeBytes { get; set; }
+}
+
+public sealed class CreateUploadFileRequest
+{
+    [JsonPropertyName("originalName")]
+    public string OriginalName { get; set; } = "";
+
+    [JsonPropertyName("sizeBytes")]
+    public long SizeBytes { get; set; }
+}
+
+public sealed class CreateUploadFileResponse
+{
+    [JsonPropertyName("fileId")]
+    public string FileId { get; set; } = "";
+
+    [JsonPropertyName("expectedChunks")]
+    public int ExpectedChunks { get; set; }
+}
+
 public sealed class ScanRequest
 {
     [JsonPropertyName("sourceIds")]
@@ -96,6 +159,15 @@ public sealed class HuggingFaceAccessSnapshot
 
     [JsonPropertyName("accessMessage")]
     public string AccessMessage { get; set; } = "";
+}
+
+public sealed class SetupState
+{
+    public bool HasToken { get; set; }
+
+    public bool TermsConfirmed { get; set; }
+
+    public bool IsReady => HasToken && TermsConfirmed;
 }
 
 public sealed class ScannedVideoItem

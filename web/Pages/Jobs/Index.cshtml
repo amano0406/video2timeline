@@ -1,0 +1,140 @@
+@page "/jobs"
+@model Video2Timeline.Web.Pages.Jobs.IndexModel
+@inject Video2Timeline.Web.Services.LanguageService LanguageService
+@inject Video2Timeline.Web.Services.JsonLocalizationService Localizer
+@{
+    var lang = LanguageService.Resolve(ViewContext.HttpContext.Request);
+    string L(string key) => Localizer.Get(lang, key);
+    string StateLabel(string? value)
+    {
+        var key = $"state.{(value ?? string.Empty).ToLowerInvariant()}";
+        var label = L(key);
+        return label == key ? value ?? "-" : label;
+    }
+
+    string StageLabel(string? value)
+    {
+        var key = $"stage.{(value ?? string.Empty).ToLowerInvariant()}";
+        var label = L(key);
+        return label == key ? value ?? "-" : label;
+    }
+
+    string FormatSize(long valueBytes) => $"{valueBytes / 1024.0 / 1024.0:F1} MB";
+    string FormatDuration(double valueSeconds) => $"{valueSeconds / 60.0:F1} {L("units.min")}";
+    ViewData["Title"] = L("jobs.list.page_title");
+}
+
+<section class="app-page space-y-6">
+    <header class="panel page-header">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+                <p class="eyebrow">@L("jobs.list.eyebrow")</p>
+                <h1 class="page-title">@L("jobs.list.page_title")</h1>
+                <p class="page-description">@L("jobs.list.description")</p>
+            </div>
+            <a class="btn-primary" href="/jobs/new">@L("layout.new_job")</a>
+        </div>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+    {
+        <section class="panel notice-panel">
+            @Model.StatusMessage
+        </section>
+    }
+
+    <section class="panel">
+        <div class="mb-4 flex items-center justify-between gap-3">
+            <div>
+                <p class="eyebrow">@L("jobs.active.title")</p>
+                <h2 class="section-title">@L("jobs.active.heading")</h2>
+            </div>
+        </div>
+
+        @if (Model.ActiveRun is null)
+        {
+            <div class="empty-state">@L("jobs.active.empty")</div>
+        }
+        else
+        {
+            <div class="grid gap-4 xl:grid-cols-5">
+                <div class="metric-card xl:col-span-2">
+                    <div class="metric-label">@L("common.run")</div>
+                    <div class="metric-value">@Model.ActiveRun.JobId</div>
+                    <div class="metric-subtle">@StateLabel(Model.ActiveRun.State) / @StageLabel(Model.ActiveRun.CurrentStage)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">@L("common.progress")</div>
+                    <div class="metric-value">@Model.ActiveRun.VideosDone / @Model.ActiveRun.VideosTotal</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">@L("common.total_size")</div>
+                    <div class="metric-value">@FormatSize(Model.ActiveRun.TotalSizeBytes)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">@L("common.total_duration")</div>
+                    <div class="metric-value">@FormatDuration(Model.ActiveRun.TotalDurationSec)</div>
+                </div>
+            </div>
+            <div class="mt-4">
+                <a class="btn-secondary" href="/runs/@Model.ActiveRun.JobId">@L("jobs.active.open_details")</a>
+            </div>
+        }
+    </section>
+
+    <section class="panel">
+        <div class="mb-4">
+            <p class="eyebrow">@L("jobs.list.history_eyebrow")</p>
+            <h2 class="section-title">@L("jobs.list.history_title")</h2>
+        </div>
+
+        @if (Model.RecentRuns.Count == 0)
+        {
+            <div class="empty-state">@L("jobs.list.empty")</div>
+        }
+        else
+        {
+            <div class="table-shell">
+                <table class="app-table">
+                    <thead>
+                        <tr>
+                            <th>@L("common.run")</th>
+                            <th>@L("common.state")</th>
+                            <th>@L("common.progress")</th>
+                            <th>@L("common.total_size")</th>
+                            <th>@L("common.total_duration")</th>
+                            <th>@L("common.updated")</th>
+                            <th>@L("common.actions")</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var run in Model.RecentRuns)
+                        {
+                            <tr>
+                                <td class="font-medium text-slate-900">@run.JobId</td>
+                                <td>@StateLabel(run.State) / @StageLabel(run.CurrentStage)</td>
+                                <td>@run.VideosDone / @run.VideosTotal</td>
+                                <td>@FormatSize(run.TotalSizeBytes)</td>
+                                <td>@FormatDuration(run.TotalDurationSec)</td>
+                                <td>@run.UpdatedAt</td>
+                                <td>
+                                    <div class="flex flex-wrap gap-2">
+                                        <a class="btn-table" href="/runs/@run.JobId">@L("common.details")</a>
+                                        @if (string.Equals(run.State, "completed", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            <a class="btn-table-success" href="/runs/@run.JobId/download">@L("common.zip")</a>
+                                        }
+                                        <form method="post" asp-page-handler="Delete" class="inline">
+                                            <input type="hidden" name="jobId" value="@run.JobId" />
+                                            <button class="btn-table-danger">@L("common.delete")</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+</section>

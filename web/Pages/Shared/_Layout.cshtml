@@ -1,33 +1,79 @@
 @inject Video2Timeline.Web.Services.LanguageService LanguageService
 @inject Video2Timeline.Web.Services.JsonLocalizationService Localizer
+@inject Video2Timeline.Web.Services.AppInstanceService AppInstanceService
+@using Video2Timeline.Web.Models
 @{
     var lang = LanguageService.Resolve(Context.Request);
     var languages = LanguageService.GetSupportedLanguages();
+    var setupState = Context.Items["SetupState"] as SetupState;
+    var settingsReady = setupState?.IsReady ?? false;
+    var appInstanceId = AppInstanceService.InstanceId;
     string L(string key) => Localizer.Get(lang, key);
     var currentUrl = $"{Context.Request.Path}{Context.Request.QueryString}";
+    var currentPath = Context.Request.Path.Value ?? "/";
+
+    string NavClass(string href, bool includeRuns = false)
+    {
+        var isActive =
+            string.Equals(currentPath, href, StringComparison.OrdinalIgnoreCase) ||
+            (!string.Equals(href, "/jobs", StringComparison.OrdinalIgnoreCase) &&
+             currentPath.StartsWith($"{href}/", StringComparison.OrdinalIgnoreCase)) ||
+            (includeRuns &&
+             (string.Equals(currentPath, href, StringComparison.OrdinalIgnoreCase) ||
+              currentPath.StartsWith("/runs", StringComparison.OrdinalIgnoreCase)));
+        return isActive ? "nav-link nav-link-active" : "nav-link";
+    }
 }
 <!DOCTYPE html>
-<html lang="@lang">
+<html lang="@lang" data-app-theme="workbench">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - video2timeline</title>
+    <script>
+        (() => {
+            const saved = localStorage.getItem("video2timeline-theme");
+            document.documentElement.dataset.appTheme = saved || "workbench";
+        })();
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
-<body class="min-h-screen bg-slate-100 text-slate-900">
-    <header class="border-b border-slate-200 bg-white/90 backdrop-blur">
-        <div class="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
-            <a href="/" class="text-lg font-semibold tracking-tight text-slate-900">video2timeline</a>
-            <nav class="flex items-center gap-3 text-sm">
-                <a href="/" class="rounded-full px-4 py-2 text-slate-700 transition hover:bg-slate-100">@L("layout.dashboard")</a>
-                <a href="/settings" class="rounded-full px-4 py-2 text-slate-700 transition hover:bg-slate-100">@L("layout.settings")</a>
-                <form method="get" action="/set-language" class="ml-2 flex items-center gap-2 rounded-full bg-slate-100 px-3 py-2">
+<body class="app-body">
+    <div class="app-shell">
+        <aside class="app-sidebar">
+            <div class="space-y-6">
+                <div class="space-y-3">
+                    <div class="badge-chip">CPU-first</div>
+                    <a href="/" class="block">
+                        <div class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Workspace</div>
+                        <div class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">video2timeline</div>
+                    </a>
+                    <p class="text-sm leading-6 text-slate-600">
+                        @L("layout.sidebar_description")
+                    </p>
+                </div>
+
+                <nav class="space-y-2">
+                    @if (settingsReady)
+                    {
+                        <a href="/jobs/new" class="@NavClass("/jobs/new")">@L("layout.new_job")</a>
+                        <a href="/jobs" class="@NavClass("/jobs", includeRuns: true)">@L("layout.jobs")</a>
+                    }
+                    <a href="/settings" class="@NavClass("/settings")">@L("layout.settings")</a>
+                </nav>
+            </div>
+
+            <div class="sidebar-footer space-y-4">
+                <div class="status-pill @(settingsReady ? "status-pill-ready" : "status-pill-blocked")">
+                    @(settingsReady ? L("layout.ready") : L("layout.setup_required"))
+                </div>
+                <form method="get" action="/set-language" class="space-y-2">
                     <input type="hidden" name="returnUrl" value="@currentUrl" />
-                    <label for="lang-switch" class="text-xs font-medium text-slate-600">@L("layout.language")</label>
+                    <label for="lang-switch" class="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">@L("layout.language")</label>
                     <select id="lang-switch"
                             name="lang"
-                            class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-700"
+                            class="form-input w-full"
                             onchange="this.form.submit()">
                         @foreach (var item in languages)
                         {
@@ -35,14 +81,87 @@
                         }
                     </select>
                 </form>
-            </nav>
+            </div>
+        </aside>
+
+        <div class="app-content">
+            <header class="app-topbar">
+                <div>
+                    <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">video2timeline</div>
+                    <div class="text-lg font-semibold text-slate-950">@ViewData["Title"]</div>
+                </div>
+            </header>
+
+            <main class="app-main">
+                @RenderBody()
+            </main>
         </div>
-    </header>
+    </div>
+    <div id="app-update-banner"
+         class="fixed bottom-4 right-4 hidden rounded-xl border border-slate-200 bg-slate-950 px-4 py-3 text-sm font-medium text-white shadow-2xl">
+        @L("layout.update_detected")
+    </div>
+    <script>
+        (() => {
+            const currentInstanceId = "@appInstanceId";
+            const pollIntervalMs = 10000;
+            const banner = document.getElementById("app-update-banner");
 
-    <main class="mx-auto max-w-7xl px-6 py-8">
-        @RenderBody()
-    </main>
+            let pendingReload = false;
+            let checking = false;
 
+            window.video2timelineSetBusy = (value) => {
+                window.__video2timelineBusy = Boolean(value);
+                if (!window.__video2timelineBusy && pendingReload) {
+                    location.reload();
+                }
+            };
+
+            const triggerReload = () => {
+                pendingReload = true;
+                banner?.classList.remove("hidden");
+                if (!window.__video2timelineBusy) {
+                    location.reload();
+                }
+            };
+
+            const checkVersion = async () => {
+                if (checking) {
+                    return;
+                }
+
+                checking = true;
+                try {
+                    const response = await fetch("/api/app/version", {
+                        method: "GET",
+                        cache: "no-store",
+                        headers: {
+                            "Accept": "application/json"
+                        }
+                    });
+                    if (!response.ok) {
+                        return;
+                    }
+
+                    const payload = await response.json();
+                    if (payload?.instanceId && payload.instanceId !== currentInstanceId) {
+                        triggerReload();
+                    }
+                } catch {
+                } finally {
+                    checking = false;
+                }
+            };
+
+            setInterval(checkVersion, pollIntervalMs);
+            document.addEventListener("visibilitychange", () => {
+                if (!document.hidden) {
+                    checkVersion();
+                }
+            });
+            window.addEventListener("focus", checkVersion);
+        })();
+    </script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

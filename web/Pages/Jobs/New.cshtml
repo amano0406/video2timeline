@@ -1,0 +1,264 @@
+@page "/jobs/new"
+@model Video2Timeline.Web.Pages.Jobs.NewModel
+@inject Video2Timeline.Web.Services.LanguageService LanguageService
+@inject Video2Timeline.Web.Services.JsonLocalizationService Localizer
+@{
+    var lang = LanguageService.Resolve(ViewContext.HttpContext.Request);
+    string L(string key) => Localizer.Get(lang, key);
+    ViewData["Title"] = L("jobs.new.page_title");
+}
+
+<section class="app-page space-y-6">
+    <header class="panel page-header">
+        <div>
+            <p class="eyebrow">@L("jobs.new.eyebrow")</p>
+            <h1 class="page-title">@L("jobs.new.page_title")</h1>
+            <p class="page-description">@L("jobs.new.description")</p>
+        </div>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+    {
+        <section class="panel notice-panel">
+            @Model.StatusMessage
+        </section>
+    }
+
+    @if (Model.ActiveRun is not null)
+    {
+        <section class="panel accent-panel">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div class="space-y-2">
+                    <p class="eyebrow">@L("jobs.active.title")</p>
+                    <h2 class="section-title">@Model.ActiveRun.JobId</h2>
+                    <p class="text-sm text-slate-600">
+                        @L("jobs.active.description")
+                    </p>
+                </div>
+                <a class="btn-secondary" href="/runs/@Model.ActiveRun.JobId">@L("jobs.active.open_details")</a>
+            </div>
+        </section>
+    }
+
+    <form method="post" enctype="multipart/form-data" class="space-y-6" id="new-job-form">
+        @if (!ViewContext.ModelState.IsValid)
+        {
+            <section class="panel error-panel" id="server-errors">
+                <ul class="list-disc space-y-1 pl-5">
+                    @foreach (var error in ViewContext.ModelState.Values.SelectMany(static value => value.Errors))
+                    {
+                        <li>@error.ErrorMessage</li>
+                    }
+                </ul>
+            </section>
+        }
+
+        <div class="grid gap-6 xl:grid-cols-2">
+            <section class="panel">
+                <div class="space-y-2">
+                    <h2 class="section-title">@L("jobs.new.files_title")</h2>
+                    <p class="text-sm text-slate-600">@L("jobs.new.files_description")</p>
+                </div>
+                <input asp-for="UploadFiles" type="file" multiple class="form-input mt-4 block w-full" id="upload-files-input" />
+            </section>
+
+            <section class="panel">
+                <div class="space-y-2">
+                    <h2 class="section-title">@L("jobs.new.directory_title")</h2>
+                    <p class="text-sm text-slate-600">@L("jobs.new.directory_description")</p>
+                </div>
+                <input asp-for="UploadDirectoryFiles" type="file" multiple webkitdirectory directory class="form-input mt-4 block w-full" id="upload-directory-input" />
+            </section>
+        </div>
+
+        <section class="panel subtle-panel text-sm text-slate-600">
+            @L("jobs.new.cache_notice")
+        </section>
+
+        <section class="panel subtle-panel hidden" id="upload-progress-panel">
+            <div class="space-y-3">
+                <div class="flex items-center justify-between gap-3">
+                    <div>
+                        <p class="eyebrow">@L("jobs.new.upload_eyebrow")</p>
+                        <h2 class="section-title" id="upload-progress-title">@L("jobs.new.upload_idle")</h2>
+                    </div>
+                    <div class="badge-chip" id="upload-progress-percent">0%</div>
+                </div>
+                <div class="h-3 overflow-hidden rounded-full bg-slate-200">
+                    <div class="h-full rounded-full bg-slate-900 transition-all" id="upload-progress-bar" style="width:0%"></div>
+                </div>
+                <p class="text-sm text-slate-600" id="upload-progress-message">@L("jobs.new.upload_waiting")</p>
+            </div>
+        </section>
+
+        <div class="flex flex-wrap items-center gap-3">
+            <a class="btn-secondary" href="/jobs">@L("common.cancel")</a>
+            @if (Model.ActiveRun is null)
+            {
+                <button asp-page-handler="Execute" class="btn-primary" id="execute-job-button">@L("jobs.new.execute")</button>
+            }
+            else
+            {
+                <button type="button" disabled class="btn-disabled">@L("jobs.new.blocked")</button>
+            }
+        </div>
+    </form>
+</section>
+
+@section Scripts
+{
+    <script>
+        (() => {
+            const form = document.getElementById("new-job-form");
+            const filesInput = document.getElementById("upload-files-input");
+            const directoryInput = document.getElementById("upload-directory-input");
+            const executeButton = document.getElementById("execute-job-button");
+            const progressPanel = document.getElementById("upload-progress-panel");
+            const progressTitle = document.getElementById("upload-progress-title");
+            const progressMessage = document.getElementById("upload-progress-message");
+            const progressPercent = document.getElementById("upload-progress-percent");
+            const progressBar = document.getElementById("upload-progress-bar");
+
+            if (!form || !filesInput || !directoryInput || !executeButton || !progressPanel || !progressTitle || !progressMessage || !progressPercent || !progressBar) {
+                return;
+            }
+
+            const messages = {
+                selectInput: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(L("jobs.new.select_input"))),
+                uploadPreparing: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(L("jobs.new.upload_preparing"))),
+                uploadRunning: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(L("jobs.new.upload_running"))),
+                uploadCreatingJob: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(L("jobs.new.upload_creating_job"))),
+                uploadCompleted: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(L("jobs.new.upload_completed"))),
+                uploadFailed: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(L("jobs.new.upload_failed"))),
+                execute: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(L("jobs.new.execute"))),
+                currentFile: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(L("jobs.new.upload_current_file")))
+            };
+
+            const chunkUploadEnabled = window.fetch && window.FormData && window.Blob;
+            if (!chunkUploadEnabled) {
+                return;
+            }
+
+            const collectFiles = () => {
+                const directFiles = Array.from(filesInput.files || []);
+                const directoryFiles = Array.from(directoryInput.files || []);
+                return [...directFiles, ...directoryFiles];
+            };
+
+            const setBusy = (busy) => {
+                if (window.video2timelineSetBusy) {
+                    window.video2timelineSetBusy(busy);
+                }
+                filesInput.disabled = busy;
+                directoryInput.disabled = busy;
+                executeButton.disabled = busy;
+                executeButton.textContent = busy ? messages.uploadRunning : messages.execute;
+            };
+
+            const updateProgress = (percent, title, message) => {
+                progressPanel.classList.remove("hidden");
+                progressTitle.textContent = title;
+                progressMessage.textContent = message;
+                progressPercent.textContent = `${percent}%`;
+                progressBar.style.width = `${percent}%`;
+            };
+
+            form.addEventListener("submit", async (event) => {
+                event.preventDefault();
+
+                const selectedFiles = collectFiles();
+                if (selectedFiles.length === 0) {
+                    window.alert(messages.selectInput);
+                    return;
+                }
+
+                const totalBytes = selectedFiles.reduce((sum, file) => sum + file.size, 0);
+                let uploadedBytes = 0;
+
+                setBusy(true);
+                updateProgress(0, messages.uploadPreparing, messages.uploadPreparing);
+
+                try {
+                    const sessionResponse = await fetch("/api/uploads/sessions", { method: "POST" });
+                    if (!sessionResponse.ok) {
+                        throw new Error(await sessionResponse.text());
+                    }
+
+                    const session = await sessionResponse.json();
+                    const chunkSize = session.chunkSizeBytes;
+                    const uploadedItems = [];
+
+                    for (const file of selectedFiles) {
+                        const registerResponse = await fetch(`/api/uploads/sessions/${session.sessionId}/files`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                originalName: file.webkitRelativePath || file.name,
+                                sizeBytes: file.size
+                            })
+                        });
+                        if (!registerResponse.ok) {
+                            throw new Error(await registerResponse.text());
+                        }
+
+                        const registered = await registerResponse.json();
+                        const totalChunks = Math.max(1, registered.expectedChunks);
+
+                        for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex += 1) {
+                            const start = chunkIndex * chunkSize;
+                            const end = Math.min(file.size, start + chunkSize);
+                            const chunk = file.slice(start, end);
+
+                            const chunkResponse = await fetch(`/api/uploads/sessions/${session.sessionId}/files/${registered.fileId}/chunks/${chunkIndex}`, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/octet-stream" },
+                                body: chunk
+                            });
+                            if (!chunkResponse.ok) {
+                                throw new Error(await chunkResponse.text());
+                            }
+
+                            uploadedBytes += (end - start);
+                            const percent = totalBytes > 0 ? Math.min(100, Math.round((uploadedBytes / totalBytes) * 100)) : 100;
+                            updateProgress(
+                                percent,
+                                messages.uploadRunning,
+                                `${messages.currentFile}: ${file.webkitRelativePath || file.name}`
+                            );
+                        }
+                    }
+
+                    const completeResponse = await fetch(`/api/uploads/sessions/${session.sessionId}/complete`, {
+                        method: "POST"
+                    });
+                    if (!completeResponse.ok) {
+                        throw new Error(await completeResponse.text());
+                    }
+
+                    const completed = await completeResponse.json();
+                    uploadedItems.push(...(completed.items || []));
+
+                    updateProgress(100, messages.uploadCreatingJob, messages.uploadCreatingJob);
+                    const jobResponse = await fetch("/api/jobs", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            uploadedFiles: uploadedItems
+                        })
+                    });
+                    if (!jobResponse.ok) {
+                        throw new Error(await jobResponse.text());
+                    }
+
+                    const created = await jobResponse.json();
+                    updateProgress(100, messages.uploadCompleted, messages.uploadCompleted);
+                    window.location.href = `/runs/${created.jobId}`;
+                } catch (error) {
+                    const text = error instanceof Error ? error.message : String(error);
+                    updateProgress(0, messages.uploadFailed, text);
+                    setBusy(false);
+                }
+            });
+        })();
+    </script>
+}

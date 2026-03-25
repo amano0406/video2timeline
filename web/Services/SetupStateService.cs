@@ -1,0 +1,17 @@
+using Video2Timeline.Web.Models;
+
+namespace Video2Timeline.Web.Services;
+
+public sealed class SetupStateService(SettingsStore settingsStore)
+{
+    public async Task<SetupState> GetAsync(CancellationToken cancellationToken = default)
+    {
+        var settings = await settingsStore.LoadAsync(cancellationToken);
+        var hasToken = await settingsStore.HasTokenAsync(cancellationToken);
+        return new SetupState
+        {
+            HasToken = hasToken,
+            TermsConfirmed = settings.HuggingfaceTermsConfirmed,
+        };
+    }
+}
