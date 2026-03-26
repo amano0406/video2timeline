@@ -37,21 +37,50 @@
             </section>
         }
 
-        <div class="grid gap-6 xl:grid-cols-2">
+        <div class="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
             <section class="panel">
                 <div class="space-y-2">
                     <h2 class="section-title">@L("jobs.new.files_title")</h2>
                     <p class="text-sm text-slate-600">@L("jobs.new.files_description")</p>
                 </div>
-                <input asp-for="UploadFiles" type="file" multiple class="form-input mt-4 block w-full" id="upload-files-input" />
+                <div class="mt-4 flex flex-wrap gap-3">
+                    <button type="button" class="btn-secondary" id="pick-files-button">@L("jobs.new.pick_files")</button>
+                    <button type="button" class="btn-secondary" id="pick-folder-button">@L("jobs.new.pick_folder")</button>
+                </div>
+                <p class="selection-hint mt-4">
+                    @string.Format(System.Globalization.CultureInfo.CurrentCulture, L("jobs.new.supported_extensions"), Model.AllowedExtensionsDisplay)
+                </p>
+                <input asp-for="UploadFiles"
+                       type="file"
+                       multiple
+                       accept="@Model.AcceptAttribute"
+                       class="hidden"
+                       id="upload-files-input" />
+                <input asp-for="UploadDirectoryFiles"
+                       type="file"
+                       multiple
+                       webkitdirectory
+                       directory
+                       accept="@Model.AcceptAttribute"
+                       class="hidden"
+                       id="upload-directory-input" />
             </section>
 
             <section class="panel">
-                <div class="space-y-2">
-                    <h2 class="section-title">@L("jobs.new.directory_title")</h2>
-                    <p class="text-sm text-slate-600">@L("jobs.new.directory_description")</p>
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div class="space-y-2">
+                        <h2 class="section-title">@L("jobs.new.selected_title")</h2>
+                        <p class="text-sm text-slate-600" id="selection-count-label">@L("jobs.new.selected_empty")</p>
+                    </div>
+                    <div class="badge-chip" id="selected-items-count">0</div>
                 </div>
-                <input asp-for="UploadDirectoryFiles" type="file" multiple webkitdirectory directory class="form-input mt-4 block w-full" id="upload-directory-input" />
+
+                <div class="selection-feedback mt-4 hidden" id="selection-feedback" aria-live="polite"></div>
+
+                <div class="selection-list-shell mt-4">
+                    <div class="selection-empty" id="selected-items-empty">@L("jobs.new.selected_empty")</div>
+                    <ul class="selection-list hidden" id="selected-items-list"></ul>
+                </div>
             </section>
         </div>
 
@@ -98,7 +127,14 @@
             const form = document.getElementById("new-job-form");
             const filesInput = document.getElementById("upload-files-input");
             const directoryInput = document.getElementById("upload-directory-input");
+            const pickFilesButton = document.getElementById("pick-files-button");
+            const pickFolderButton = document.getElementById("pick-folder-button");
             const executeButton = document.getElementById("execute-job-button");
+            const selectedItemsList = document.getElementById("selected-items-list");
+            const selectedItemsEmpty = document.getElementById("selected-items-empty");
+            const selectedItemsCount = document.getElementById("selected-items-count");
+            const selectionCountLabel = document.getElementById("selection-count-label");
+            const selectionFeedback = document.getElementById("selection-feedback");
             const progressPanel = document.getElementById("upload-overlay");
             const progressTitle = document.getElementById("upload-progress-title");
             const progressMessage = document.getElementById("upload-progress-message");
@@ -106,12 +142,21 @@
             const progressBar = document.getElementById("upload-progress-bar");
             const cancelButton = document.getElementById("upload-cancel-button");
 
-            if (!form || !filesInput || !directoryInput || !executeButton || !progressPanel || !progressTitle || !progressMessage || !progressPercent || !progressBar || !cancelButton) {
+            if (!form || !filesInput || !directoryInput || !pickFilesButton || !pickFolderButton || !executeButton || !selectedItemsList || !selectedItemsEmpty || !selectedItemsCount || !selectionCountLabel || !selectionFeedback || !progressPanel || !progressTitle || !progressMessage || !progressPercent || !progressBar || !cancelButton) {
                 return;
             }
 
+            const allowedExtensions = new Set(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AllowedExtensions.Select(static value => value.ToLowerInvariant()))));
             const messages = {
                 selectInput: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(L("jobs.new.select_input"))),
+                pickFiles: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(L("jobs.new.pick_files"))),
+                pickFolder: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(L("jobs.new.pick_folder"))),
+                selectedEmpty: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(L("jobs.new.selected_empty"))),
+                selectedCount: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(L("jobs.new.selected_count"))),
+                sourceFiles: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(L("jobs.new.source_files"))),
+                sourceFolder: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(L("jobs.new.source_folder"))),
+                duplicateSummary: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(L("jobs.new.duplicate_summary"))),
+                unsupportedSummary: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(L("jobs.new.unsupported_summary"))),
                 uploadPreparing: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(L("jobs.new.upload_preparing"))),
                 uploadRunning: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(L("jobs.new.upload_running"))),
                 uploadCreatingJob: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(L("jobs.new.upload_creating_job"))),
@@ -133,12 +178,155 @@
             let uploadController = null;
             let uploadInProgress = false;
             let cancelRequested = false;
-
-            const collectFiles = () => {
-                const directFiles = Array.from(filesInput.files || []);
-                const directoryFiles = Array.from(directoryInput.files || []);
-                return [...directFiles, ...directoryFiles];
+            let suppressLeaveWarning = false;
+            let selectionSequence = 0;
+            const selectedEntries = [];
+            const selectionKeys = new Set();
+            const selectionFeedbackState = {
+                duplicates: [],
+                unsupported: []
             };
+
+            const format = (template, ...values) => values.reduce(
+                (current, value, index) => current.replace(`{${index}}`, String(value)),
+                template);
+
+            const formatBytes = (value) => {
+                if (value >= 1024 * 1024 * 1024) {
+                    return `${(value / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+                }
+                if (value >= 1024 * 1024) {
+                    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+                }
+                if (value >= 1024) {
+                    return `${Math.round(value / 1024)} KB`;
+                }
+                return `${value} B`;
+            };
+
+            const getDisplayName = (file, sourceKind) => {
+                if (sourceKind === "folder" && file.webkitRelativePath) {
+                    return file.webkitRelativePath;
+                }
+                return file.name;
+            };
+
+            const getExtension = (fileName) => {
+                const lastDot = fileName.lastIndexOf(".");
+                return lastDot >= 0 ? fileName.slice(lastDot).toLowerCase() : "";
+            };
+
+            const getEntryKey = (file, sourceKind) => {
+                const displayName = getDisplayName(file, sourceKind).toLowerCase();
+                return `${displayName}::${file.size}::${file.lastModified}`;
+            };
+
+            const createFeedbackElement = (text, tone) => {
+                const item = document.createElement("div");
+                item.className = `selection-feedback-item selection-feedback-item-${tone}`;
+                item.textContent = text;
+                return item;
+            };
+
+            const renderSelectionState = () => {
+                selectedItemsCount.textContent = selectedEntries.length.toString();
+                selectionCountLabel.textContent = selectedEntries.length === 0
+                    ? messages.selectedEmpty
+                    : format(messages.selectedCount, selectedEntries.length);
+
+                selectedItemsList.innerHTML = "";
+                if (selectedEntries.length === 0) {
+                    selectedItemsEmpty.classList.remove("hidden");
+                    selectedItemsList.classList.add("hidden");
+                } else {
+                    selectedItemsEmpty.classList.add("hidden");
+                    selectedItemsList.classList.remove("hidden");
+
+                    for (const entry of selectedEntries) {
+                        const item = document.createElement("li");
+                        item.className = "selection-item";
+                        item.dataset.entryId = entry.id;
+                        item.innerHTML = `
+                            <div class="selection-item-body">
+                                <div class="selection-item-title">${entry.displayName}</div>
+                                <div class="selection-item-meta">
+                                    <span class="selection-chip">${entry.sourceKind === "folder" ? messages.sourceFolder : messages.sourceFiles}</span>
+                                    <span>${formatBytes(entry.file.size)}</span>
+                                </div>
+                            </div>
+                            <button type="button" class="selection-remove-button" data-entry-id="${entry.id}">@L("common.delete")</button>
+                        `;
+                        selectedItemsList.appendChild(item);
+                    }
+                }
+
+                selectionFeedback.innerHTML = "";
+                const hasUnsupported = selectionFeedbackState.unsupported.length > 0;
+                const hasDuplicates = selectionFeedbackState.duplicates.length > 0;
+                if (!hasUnsupported && !hasDuplicates) {
+                    selectionFeedback.classList.add("hidden");
+                    return;
+                }
+
+                selectionFeedback.classList.remove("hidden");
+                if (hasUnsupported) {
+                    selectionFeedback.appendChild(
+                        createFeedbackElement(
+                            format(messages.unsupportedSummary, selectionFeedbackState.unsupported.length),
+                            "warning"));
+                }
+                if (hasDuplicates) {
+                    selectionFeedback.appendChild(
+                        createFeedbackElement(
+                            format(messages.duplicateSummary, selectionFeedbackState.duplicates.length),
+                            "info"));
+                }
+            };
+
+            const addFilesToSelection = (files, sourceKind) => {
+                selectionFeedbackState.duplicates = [];
+                selectionFeedbackState.unsupported = [];
+
+                for (const file of files) {
+                    const displayName = getDisplayName(file, sourceKind);
+                    const extension = getExtension(displayName || file.name);
+                    if (allowedExtensions.size > 0 && !allowedExtensions.has(extension)) {
+                        selectionFeedbackState.unsupported.push(displayName);
+                        continue;
+                    }
+
+                    const key = getEntryKey(file, sourceKind);
+                    if (selectionKeys.has(key)) {
+                        selectionFeedbackState.duplicates.push(displayName);
+                        continue;
+                    }
+
+                    selectionSequence += 1;
+                    selectionKeys.add(key);
+                    selectedEntries.push({
+                        id: `selection-${selectionSequence}`,
+                        key,
+                        file,
+                        sourceKind,
+                        displayName
+                    });
+                }
+
+                renderSelectionState();
+            };
+
+            const removeSelectionEntry = (entryId) => {
+                const index = selectedEntries.findIndex((entry) => entry.id === entryId);
+                if (index < 0) {
+                    return;
+                }
+
+                const [removed] = selectedEntries.splice(index, 1);
+                selectionKeys.delete(removed.key);
+                renderSelectionState();
+            };
+
+            const collectFiles = () => selectedEntries.map((entry) => entry.file);
 
             const setBusy = (busy) => {
                 if (window.video2timelineSetBusy) {
@@ -147,6 +335,8 @@
                 uploadInProgress = busy;
                 filesInput.disabled = busy;
                 directoryInput.disabled = busy;
+                pickFilesButton.disabled = busy;
+                pickFolderButton.disabled = busy;
                 executeButton.disabled = busy;
                 executeButton.textContent = busy ? messages.uploadRunning : messages.execute;
                 cancelButton.disabled = !busy;
@@ -177,6 +367,19 @@
                 progressBar.style.width = `${percent}%`;
             };
 
+            const readErrorMessage = async (response) => {
+                try {
+                    const payload = await response.clone().json();
+                    if (payload && typeof payload.error === "string" && payload.error.trim().length > 0) {
+                        return payload.error;
+                    }
+                } catch {
+                }
+
+                const text = await response.text();
+                return text || messages.uploadFailed;
+            };
+
             const isEditableTarget = (target) => {
                 if (!(target instanceof HTMLElement)) {
                     return false;
@@ -204,14 +407,43 @@
                 updateProgress(0, messages.uploadCancelled, messages.uploadCancelled);
             });
 
-            window.addEventListener("beforeunload", (event) => {
-                if (!uploadInProgress) {
+            pickFilesButton.addEventListener("click", () => filesInput.click());
+            pickFolderButton.addEventListener("click", () => directoryInput.click());
+
+            filesInput.addEventListener("change", () => {
+                addFilesToSelection(Array.from(filesInput.files || []), "files");
+                filesInput.value = "";
+            });
+
+            directoryInput.addEventListener("change", () => {
+                addFilesToSelection(Array.from(directoryInput.files || []), "folder");
+                directoryInput.value = "";
+            });
+
+            selectedItemsList.addEventListener("click", (event) => {
+                const target = event.target;
+                if (!(target instanceof HTMLElement)) {
+                    return;
+                }
+
+                const entryId = target.dataset.entryId;
+                if (!entryId) {
+                    return;
+                }
+
+                removeSelectionEntry(entryId);
+            });
+
+            const handleBeforeUnload = (event) => {
+                if (!uploadInProgress || suppressLeaveWarning) {
                     return;
                 }
 
                 event.preventDefault();
                 event.returnValue = messages.leaveWarning;
-            });
+            };
+
+            window.addEventListener("beforeunload", handleBeforeUnload);
 
             document.addEventListener("keydown", (event) => {
                 if (!uploadInProgress) {
@@ -251,7 +483,7 @@
                         signal: uploadController.signal
                     });
                     if (!sessionResponse.ok) {
-                        throw new Error(await sessionResponse.text());
+                        throw new Error(await readErrorMessage(sessionResponse));
                     }
 
                     const session = await sessionResponse.json();
@@ -270,7 +502,7 @@
                             })
                         });
                         if (!registerResponse.ok) {
-                            throw new Error(await registerResponse.text());
+                            throw new Error(await readErrorMessage(registerResponse));
                         }
 
                         const registered = await registerResponse.json();
@@ -288,7 +520,7 @@
                                 body: chunk
                             });
                             if (!chunkResponse.ok) {
-                                throw new Error(await chunkResponse.text());
+                                throw new Error(await readErrorMessage(chunkResponse));
                             }
 
                             uploadedBytes += (end - start);
@@ -306,7 +538,7 @@
                         signal: uploadController.signal
                     });
                     if (!completeResponse.ok) {
-                        throw new Error(await completeResponse.text());
+                        throw new Error(await readErrorMessage(completeResponse));
                     }
 
                     const completed = await completeResponse.json();
@@ -321,13 +553,16 @@
                         })
                     });
                     if (!jobResponse.ok) {
-                        throw new Error(await jobResponse.text());
+                        throw new Error(await readErrorMessage(jobResponse));
                     }
 
                     const created = await jobResponse.json();
                     updateProgress(100, messages.uploadCompleted, messages.uploadCompleted);
+                    suppressLeaveWarning = true;
+                    uploadInProgress = false;
+                    window.removeEventListener("beforeunload", handleBeforeUnload);
                     activeSessionId = null;
-                    window.location.href = `/runs/${created.jobId}`;
+                    window.location.assign(`/runs/${created.jobId}`);
                 } catch (error) {
                     if (!cancelRequested) {
                         await cleanupSession();
@@ -335,6 +570,7 @@
                         updateProgress(0, messages.uploadFailed, text);
                     }
 
+                    suppressLeaveWarning = false;
                     setBusy(false);
                     uploadController = null;
                 }

@@ -287,6 +287,116 @@ code {
   box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.10);
 }
 
+.selection-hint {
+  font-size: 0.88rem;
+  color: var(--app-text-muted);
+}
+
+.selection-feedback {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.selection-feedback-item {
+  border-radius: 16px;
+  padding: 0.8rem 0.95rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.selection-feedback-item-warning {
+  background: var(--app-warning-soft);
+  color: var(--app-warning);
+}
+
+.selection-feedback-item-info {
+  background: var(--app-accent-soft);
+  color: var(--app-accent);
+}
+
+.selection-list-shell {
+  overflow: hidden;
+  border: 1px solid var(--app-border);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.selection-empty {
+  padding: 1.4rem 1rem;
+  text-align: center;
+  font-size: 0.92rem;
+  color: var(--app-text-muted);
+}
+
+.selection-list {
+  max-height: 21rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.selection-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.95rem 1rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.selection-item:last-child {
+  border-bottom: none;
+}
+
+.selection-item-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.selection-item-title {
+  overflow-wrap: anywhere;
+  font-size: 0.92rem;
+  font-weight: 650;
+  color: var(--app-primary-strong);
+}
+
+.selection-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--app-text-muted);
+}
+
+.selection-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  background: rgba(15, 23, 42, 0.08);
+  color: var(--app-primary-soft);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.selection-remove-button {
+  border: 1px solid rgba(190, 18, 60, 0.18);
+  border-radius: 999px;
+  background: white;
+  color: var(--app-danger);
+  padding: 0.45rem 0.8rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.selection-remove-button:hover {
+  background: var(--app-danger-soft);
+}
+
 .btn-primary,
 .btn-secondary,
 .btn-disabled,

@@ -81,7 +81,6 @@
                 <p class="page-description">@run.RunDirectory</p>
             </div>
             <div class="flex flex-wrap gap-2">
-                <a class="btn-secondary" href="/jobs">@L("layout.jobs")</a>
                 @if (string.Equals(status?.State, "completed", StringComparison.OrdinalIgnoreCase))
                 {
                     <a class="btn-secondary" href="/runs/@run.JobId/download">@L("details.download_zip")</a>
@@ -208,7 +207,14 @@
 
     <section class="panel timeline-shell">
         <h2 class="section-title">@L("details.worker_log")</h2>
-        <pre class="mt-4 max-h-[32rem] text-xs">@run.LogTail</pre>
+        @if (string.IsNullOrWhiteSpace(run.LogTail))
+        {
+            <div class="selection-empty mt-4">@L("details.worker_log_empty")</div>
+        }
+        else
+        {
+            <pre class="mt-4 max-h-[32rem] text-xs">@run.LogTail</pre>
+        }
     </section>
 </section>
 

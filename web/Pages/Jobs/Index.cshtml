@@ -55,13 +55,10 @@
 
 <section class="app-page space-y-6" id="jobs-page" data-has-active="@(Model.ActiveRun is not null ? "true" : "false")">
     <header class="panel page-header">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-                <p class="eyebrow">@L("jobs.list.eyebrow")</p>
-                <h1 class="page-title">@L("jobs.list.page_title")</h1>
-                <p class="page-description">@L("jobs.list.description")</p>
-            </div>
-            <a class="btn-primary" href="/jobs/new">@L("layout.new_job")</a>
+        <div>
+            <p class="eyebrow">@L("jobs.list.eyebrow")</p>
+            <h1 class="page-title">@L("jobs.list.page_title")</h1>
+            <p class="page-description">@L("jobs.list.description")</p>
         </div>
     </header>
 

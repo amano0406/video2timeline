@@ -3,7 +3,7 @@ using Video2Timeline.Web.Models;
 
 namespace Video2Timeline.Web.Services;
 
-public sealed class UploadSessionStore(AppPaths paths)
+public sealed class UploadSessionStore(AppPaths paths, SettingsStore settingsStore)
 {
     private const long ChunkSizeBytes = 8L * 1024 * 1024;
 
@@ -47,6 +47,10 @@ public sealed class UploadSessionStore(AppPaths paths)
         if (request.SizeBytes < 0)
         {
             throw new InvalidOperationException("The upload file size is invalid.");
+        }
+        if (!await IsSupportedExtensionAsync(request.OriginalName, cancellationToken))
+        {
+            throw new InvalidOperationException($"Unsupported video file type: {request.OriginalName}");
         }
 
         var document = await RequireSessionAsync(sessionId, cancellationToken);
@@ -207,5 +211,22 @@ public sealed class UploadSessionStore(AppPaths paths)
         var normalizedRoot = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
             + Path.DirectorySeparatorChar;
         return candidate.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task<bool> IsSupportedExtensionAsync(string fileName, CancellationToken cancellationToken)
+    {
+        var settings = await settingsStore.LoadAsync(cancellationToken);
+        if (settings.VideoExtensions.Count == 0)
+        {
+            return true;
+        }
+
+        var extension = Path.GetExtension(fileName)?.Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(extension))
+        {
+            return false;
+        }
+
+        return settings.VideoExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase);
     }
 }
