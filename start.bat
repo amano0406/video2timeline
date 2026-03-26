@@ -66,7 +66,28 @@ goto wait_loop
 
 :ready
 echo video2timeline is ready at http://localhost:%WEB_PORT%
-start "" "http://localhost:%WEB_PORT%"
+if /I "%VIDEO2TIMELINE_SKIP_BROWSER_OPEN%"=="1" exit /b 0
+
+set "APP_URL=http://localhost:%WEB_PORT%"
+set "APP_WINDOW_SIZE=1440,960"
+set "APP_BROWSER="
+set "APP_BROWSER_NAME="
+
+call :use_default_browser
+call :use_browser "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" "Microsoft Edge"
+call :use_browser "C:\Program Files\Microsoft\Edge\Application\msedge.exe" "Microsoft Edge"
+call :use_browser "C:\Program Files\Google\Chrome\Application\chrome.exe" "Google Chrome"
+call :use_browser "C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe" "Brave"
+call :use_browser "C:\Program Files\Chromium\Application\chrome.exe" "Chromium"
+
+if defined APP_BROWSER (
+  echo Opening dedicated app window with %APP_BROWSER_NAME%...
+  start "" "%APP_BROWSER%" --app="%APP_URL%" --window-size=%APP_WINDOW_SIZE%
+  exit /b 0
+)
+
+echo No supported Chromium-based app-mode browser was found. Opening the default browser instead.
+start "" "%APP_URL%"
 exit /b 0
 
 :failed
@@ -77,3 +98,21 @@ echo.
 echo Last container logs:
 docker compose logs --tail 40 web worker
 exit /b 1
+
+:use_browser
+if defined APP_BROWSER exit /b 0
+if exist %~1 (
+  set "APP_BROWSER=%~1"
+  set "APP_BROWSER_NAME=%~2"
+)
+exit /b 0
+
+:use_default_browser
+if defined APP_BROWSER exit /b 0
+for /f "usebackq tokens=1,2 delims=|" %%A in (`powershell -NoLogo -NoProfile -Command "$progId=(Get-ItemProperty 'HKCU:\\Software\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\http\\UserChoice' -ErrorAction SilentlyContinue).ProgId; if($progId){ $cmd=(Get-ItemProperty ('Registry::HKEY_CLASSES_ROOT\\' + $progId + '\\shell\\open\\command') -ErrorAction SilentlyContinue).'(default)'; if($cmd){ if($cmd -match '\"([^\"]+\\.exe)\"'){ $exe=$Matches[1] } elseif($cmd -match '^([^ ]+\\.exe)'){ $exe=$Matches[1] } if($exe){ $lower=$exe.ToLowerInvariant(); $name=$null; if($lower -like '*\\microsoft\\edge\\application\\msedge.exe'){ $name='Microsoft Edge' } elseif($lower -like '*\\google\\chrome\\application\\chrome.exe'){ $name='Google Chrome' } elseif($lower -like '*\\bravesoftware\\brave-browser\\application\\brave.exe'){ $name='Brave' } elseif($lower -like '*\\chromium\\application\\chrome.exe'){ $name='Chromium' } if($name){ Write-Output ($exe + '|' + $name) } } } }"`) do (
+  if not defined APP_BROWSER (
+    set "APP_BROWSER=%%~A"
+    set "APP_BROWSER_NAME=%%~B"
+  )
+)
+exit /b 0

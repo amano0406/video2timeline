@@ -134,6 +134,8 @@ Then:
 8. start a job
 9. download the completed ZIP package
 
+`start.bat` / `start.command` first try to open a dedicated app-style window with Microsoft Edge, Google Chrome, Brave, or Chromium. If none of those are installed, the app opens in the normal default browser.
+
 The start script also checks:
 
 - whether Docker Desktop is installed
@@ -148,14 +150,13 @@ Stop:
 .\stop.bat
 ```
 
-Complete reset:
+Uninstall:
 
 ```powershell
-.\reset.bat
+.\uninstall.bat
 ```
 
-The reset script asks for confirmation before it removes Docker resources. It can also delete `.env` and the generated output directory if you explicitly confirm those steps.
-By default it asks separately whether you also want to delete the saved app-data volume. That volume contains the saved Hugging Face token and app settings.
+The uninstall script asks for confirmation before it removes Docker resources. It also asks separately whether you want to delete the saved app-data volume. That volume contains the saved Hugging Face token and app settings.
 
 ## Supported Input Formats
 

@@ -3,38 +3,12 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-COMPOSE_PROJECT="$(basename "$PWD")"
+COMPOSE_PROJECT="video2timeline"
 APPDATA_VOLUME="${COMPOSE_PROJECT}_app-data"
 OUTPUTS_VOLUME="${COMPOSE_PROJECT}_outputs"
 UPLOADS_VOLUME="${COMPOSE_PROJECT}_uploads"
 HF_CACHE_VOLUME="${COMPOSE_PROJECT}_hf-cache"
 TORCH_CACHE_VOLUME="${COMPOSE_PROJECT}_torch-cache"
-
-AUTO_CONFIRM=false
-AUTO_DELETE_ENV=false
-AUTO_DELETE_APPDATA=false
-
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --yes)
-      AUTO_CONFIRM=true
-      shift
-      ;;
-    --delete-env)
-      AUTO_DELETE_ENV=true
-      shift
-      ;;
-    --delete-appdata)
-      AUTO_DELETE_APPDATA=true
-      shift
-      ;;
-    *)
-      echo "Unknown option: $1"
-      echo "Supported options: --yes --delete-env --delete-appdata"
-      exit 1
-      ;;
-  esac
-done
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "Docker Desktop is not installed or docker is not on PATH."
@@ -48,7 +22,7 @@ if ! docker info >/dev/null 2>&1; then
 fi
 
 echo
-echo "video2timeline reset"
+echo "video2timeline uninstall"
 echo
 echo "This will remove:"
 echo "  - Docker containers for this project"
@@ -63,17 +37,29 @@ if [[ -f ".env" ]]; then
 fi
 echo
 
-if [[ "${AUTO_CONFIRM}" != "true" ]]; then
-  read -r -p "Type RESET to continue: " RESET_CONFIRM
-  if [[ "${RESET_CONFIRM}" != "RESET" ]]; then
-    echo "Reset canceled."
-    exit 1
-  fi
+confirm_yes() {
+  local prompt_text="$1"
+  local response
+  read -r -p "${prompt_text}" response
+  case "${response}" in
+    y|Y|yes|YES|Yes)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+if ! confirm_yes "Continue with uninstall? [y/n]: "; then
+  echo "Uninstall canceled."
+  exit 1
 fi
 
 echo
 echo "Stopping and removing Docker resources..."
 docker compose -f docker-compose.yml -f docker-compose.gpu.yml down --rmi local --remove-orphans
+
 remove_volume_if_exists() {
   local volume_name="$1"
   if docker volume ls --format '{{.Name}}' | grep -Fxq "${volume_name}"; then
@@ -87,40 +73,28 @@ remove_volume_if_exists "${OUTPUTS_VOLUME}"
 remove_volume_if_exists "${HF_CACHE_VOLUME}"
 remove_volume_if_exists "${TORCH_CACHE_VOLUME}"
 
-if [[ "${AUTO_DELETE_APPDATA}" == "true" ]]; then
+echo
+echo "Saved app data volume:"
+echo "  ${APPDATA_VOLUME}"
+echo "This includes your saved Hugging Face token and app settings."
+if confirm_yes "Delete saved token and settings too? [y/n]: "; then
   remove_volume_if_exists "${APPDATA_VOLUME}"
   echo "Deleted saved app data volume."
 else
-  echo
-  echo "Saved app data volume:"
-  echo "  ${APPDATA_VOLUME}"
-  echo "This includes your saved Hugging Face token and app settings."
-  read -r -p "Delete saved token and settings too? Type DELETE_DATA to confirm or press Enter to keep them: " DELETE_APPDATA_CONFIRM
-  if [[ "${DELETE_APPDATA_CONFIRM}" == "DELETE_DATA" ]]; then
-    remove_volume_if_exists "${APPDATA_VOLUME}"
-    echo "Deleted saved app data volume."
-  else
-    echo "Kept saved token and settings."
-  fi
+  echo "Kept saved token and settings."
 fi
 
 echo "Docker resources removed."
 
 if [[ -f ".env" ]]; then
-  if [[ "${AUTO_DELETE_ENV}" == "true" ]]; then
+  echo
+  if confirm_yes "Delete local .env as well? [y/n]: "; then
     rm -f ".env"
     echo "Deleted .env"
   else
-    echo
-    read -r -p "Delete local .env as well? Type DELETE_ENV to confirm or press Enter to keep it: " DELETE_ENV_CONFIRM
-    if [[ "${DELETE_ENV_CONFIRM}" == "DELETE_ENV" ]]; then
-      rm -f ".env"
-      echo "Deleted .env"
-    else
-      echo "Kept .env"
-    fi
+    echo "Kept .env"
   fi
 fi
 
 echo
-echo "Reset completed."
+echo "Uninstall completed."

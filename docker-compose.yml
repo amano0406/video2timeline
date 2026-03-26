@@ -1,3 +1,5 @@
+name: video2timeline
+
 services:
   web:
     build:

@@ -94,15 +94,16 @@ macOS:
 その後の流れ:
 
 1. `start.bat` / `start.command` が `.env` を自動作成します
-2. `.env` の入力パスと出力パスを設定します
-3. `http://localhost:38090` を開きます
-4. 最初に `Settings` を開きます
-5. `CPU` または `GPU` を選びます
-6. 必要なら Hugging Face token を保存します
-7. 必要なモデルの承認を行います
-8. 動画ファイルまたはフォルダを選びます
-9. ジョブを開始します
-10. 完了した ZIP をダウンロードします
+2. `http://localhost:38090` を開きます
+3. 最初に `Settings` を開きます
+4. `CPU` または `GPU` を選びます
+5. 必要なら Hugging Face token を保存します
+6. 必要なモデルの承認を行います
+7. 動画ファイルまたはフォルダを選びます
+8. ジョブを開始します
+9. 完了した ZIP をダウンロードします
+
+`start.bat` / `start.command` は、最初に Microsoft Edge、Google Chrome、Brave、Chromium のアプリモードで開こうとします。見つからない場合は通常の既定ブラウザで開きます。
 
 停止:
 
@@ -110,13 +111,13 @@ macOS:
 .\stop.bat
 ```
 
-完全リセット:
+アンインストール:
 
 ```powershell
-.\reset.bat
+.\uninstall.bat
 ```
 
-`reset` は確認付きです。Docker のコンテナ、イメージ、ネットワーク、一時ボリュームを削除します。保存済みの Hugging Face token と設定を含む `app-data` ボリュームは別確認で削除できます。必要なら `.env` と出力フォルダも追加で削除できます。
+`uninstall` は確認付きです。Docker のコンテナ、イメージ、ネットワーク、一時ボリュームを削除します。保存済みの Hugging Face token と設定を含む `app-data` ボリュームは別確認で削除できます。必要なら `.env` も追加で削除できます。
 
 ## 対応入力形式
 
