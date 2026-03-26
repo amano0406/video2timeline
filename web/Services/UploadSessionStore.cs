@@ -138,6 +138,27 @@ public sealed class UploadSessionStore(AppPaths paths)
             .ToList();
     }
 
+    public Task<bool> DeleteSessionAsync(string sessionId, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var sessionDirectory = GetSessionDirectory(sessionId);
+        if (!Directory.Exists(sessionDirectory))
+        {
+            return Task.FromResult(false);
+        }
+
+        var uploadsRoot = Path.GetFullPath(paths.UploadsRoot);
+        var fullSessionDirectory = Path.GetFullPath(sessionDirectory);
+        if (!IsSubdirectoryOf(fullSessionDirectory, uploadsRoot))
+        {
+            throw new InvalidOperationException("The upload session path is invalid.");
+        }
+
+        Directory.Delete(fullSessionDirectory, recursive: true);
+        return Task.FromResult(true);
+    }
+
     private async Task<UploadSessionDocument> RequireSessionAsync(string sessionId, CancellationToken cancellationToken)
     {
         var path = GetSessionPath(sessionId);
@@ -174,5 +195,17 @@ public sealed class UploadSessionStore(AppPaths paths)
         var invalid = Path.GetInvalidFileNameChars();
         var sanitized = new string(value.Select(ch => invalid.Contains(ch) ? '_' : ch).ToArray());
         return string.IsNullOrWhiteSpace(sanitized) ? $"upload-{Guid.NewGuid():N}.bin" : sanitized;
+    }
+
+    private static bool IsSubdirectoryOf(string candidate, string root)
+    {
+        if (string.Equals(candidate, root, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var normalizedRoot = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+        return candidate.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase);
     }
 }

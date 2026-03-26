@@ -84,6 +84,7 @@ public sealed class SettingsModel(
         settings.ComputeMode = ComputeMode;
         settings.ProcessingQuality = ProcessingQuality;
         settings.UiLanguage = languageService.Normalize(UiLanguage) ?? "en";
+        settings.LanguageSelected = true;
         settings.HuggingfaceTermsConfirmed = false;
         await settingsStore.SaveAsync(
             settings,

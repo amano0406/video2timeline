@@ -65,7 +65,34 @@ app.Use(async (context, next) =>
     var setupState = await setupStateService.GetAsync(context.RequestAborted);
     context.Items["SetupState"] = setupState;
 
-    if (setupState.IsReady || IsAllowedWithoutSetup(path))
+    if (setupState.IsReady)
+    {
+        await next();
+        return;
+    }
+
+    if (!setupState.HasSelectedLanguage)
+    {
+        if (IsAllowedBeforeLanguageSelection(path))
+        {
+            await next();
+            return;
+        }
+
+        if (path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase))
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            await context.Response.WriteAsJsonAsync(
+                new { error = "Choose a language before using this endpoint." },
+                context.RequestAborted);
+            return;
+        }
+
+        context.Response.Redirect("/language");
+        return;
+    }
+
+    if (IsAllowedWithoutSetup(path))
     {
         await next();
         return;
@@ -164,6 +191,22 @@ app.MapPost("/api/uploads/sessions/{sessionId}/complete", async (
     }
 });
 
+app.MapDelete("/api/uploads/sessions/{sessionId}", async (
+    string sessionId,
+    UploadSessionStore uploadSessionStore,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var deleted = await uploadSessionStore.DeleteSessionAsync(sessionId, cancellationToken);
+        return deleted ? Results.NoContent() : Results.NotFound();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
 app.MapPost("/api/jobs", async (CreateJobCommand command, RunStore runStore, CancellationToken cancellationToken) =>
 {
     try
@@ -221,6 +264,10 @@ app.MapGet("/api/app/version", (AppInstanceService appInstanceService) =>
 });
 
 app.Run();
+
+static bool IsAllowedBeforeLanguageSelection(PathString path) =>
+    path.StartsWithSegments("/language", StringComparison.OrdinalIgnoreCase) ||
+    path.StartsWithSegments("/Error", StringComparison.OrdinalIgnoreCase);
 
 static bool IsAllowedWithoutSetup(PathString path) =>
     path.StartsWithSegments("/settings", StringComparison.OrdinalIgnoreCase) ||

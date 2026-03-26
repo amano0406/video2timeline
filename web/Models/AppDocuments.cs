@@ -42,6 +42,9 @@ public sealed class AppSettingsDocument
 
     [JsonPropertyName("uiLanguage")]
     public string UiLanguage { get; set; } = "en";
+
+    [JsonPropertyName("languageSelected")]
+    public bool LanguageSelected { get; set; }
 }
 
 public sealed class UploadedFileReference
@@ -247,6 +250,8 @@ public sealed class SetupState
     public bool HasToken { get; set; }
 
     public bool TermsConfirmed { get; set; }
+
+    public bool HasSelectedLanguage { get; set; }
 
     public bool IsReady => HasToken && TermsConfirmed;
 }

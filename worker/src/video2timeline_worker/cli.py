@@ -13,7 +13,6 @@ from .job_store import (
     collect_input_items,
     create_job,
     find_run_dir,
-    get_active_run,
     list_runs,
     settings_snapshot,
 )
@@ -291,10 +290,6 @@ def cmd_jobs_create(
     as_json: bool,
 ) -> int:
     settings = load_settings()
-    active = get_active_run(settings)
-    if active is not None:
-        raise ValueError(f"Another job is already active: {active['job_id']}")
-
     input_items = collect_input_items(
         settings=settings,
         files=files,

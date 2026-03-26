@@ -10,6 +10,7 @@ public sealed class SetupStateService(SettingsStore settingsStore)
         var hasToken = await settingsStore.HasTokenAsync(cancellationToken);
         return new SetupState
         {
+            HasSelectedLanguage = settings.LanguageSelected,
             HasToken = hasToken,
             TermsConfirmed = settings.HuggingfaceTermsConfirmed,
         };

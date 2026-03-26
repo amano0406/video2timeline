@@ -34,47 +34,13 @@ open_app_window() {
   return 1
 }
 
-get_default_browser_app() {
-  local ls_plist="$HOME/Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist"
-  if [ ! -f "${ls_plist}" ]; then
-    return 1
-  fi
-
-  local bundle_id
-  bundle_id="$(
-    /usr/bin/plutil -convert json -o - "${ls_plist}" 2>/dev/null \
-      | /usr/bin/grep -A 6 '"LSHandlerURLScheme"[[:space:]]*:[[:space:]]*"http"' \
-      | /usr/bin/grep '"LSHandlerRoleAll"' \
-      | /usr/bin/head -n 1 \
-      | /usr/bin/sed -E 's/.*"LSHandlerRoleAll"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/'
-  )"
-
-  case "${bundle_id}" in
-    com.microsoft.edgemac)
-      echo "Microsoft Edge"
-      ;;
-    com.google.Chrome)
-      echo "Google Chrome"
-      ;;
-    com.brave.Browser)
-      echo "Brave Browser"
-      ;;
-    org.chromium.Chromium)
-      echo "Chromium"
-      ;;
-    *)
-      return 1
-      ;;
-  esac
-}
-
 WEB_PORT="$(read_env_value VIDEO2TIMELINE_WEB_PORT)"
 if [ -z "${WEB_PORT}" ]; then
   WEB_PORT="38090"
 fi
 
 APP_URL="http://localhost:${WEB_PORT}"
-APP_WINDOW_SIZE="1440,960"
+APP_WINDOW_SIZE="960,640"
 
 echo "Starting web and worker containers..."
 compose_args=(-f docker-compose.yml)
@@ -93,11 +59,7 @@ for _ in $(seq 1 45); do
       if [ "${VIDEO2TIMELINE_SKIP_BROWSER_OPEN:-0}" = "1" ]; then
         exit 0
       fi
-      DEFAULT_BROWSER_APP="$(get_default_browser_app || true)"
-      if [ -n "${DEFAULT_BROWSER_APP}" ] && open_app_window "${DEFAULT_BROWSER_APP}"; then
-        exit 0
-      fi
-      if open_app_window "Microsoft Edge" || open_app_window "Google Chrome" || open_app_window "Brave Browser" || open_app_window "Chromium"; then
+      if open_app_window "Google Chrome" || open_app_window "Microsoft Edge" || open_app_window "Brave Browser" || open_app_window "Chromium"; then
         exit 0
       fi
       echo "No supported Chromium-based app-mode browser was found. Opening the default browser instead."

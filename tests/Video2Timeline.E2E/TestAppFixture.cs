@@ -174,6 +174,7 @@ internal sealed class TestAppFixture : IAsyncDisposable
             },
             huggingfaceTermsConfirmed = true,
             uiLanguage = "en",
+            languageSelected = true,
         };
 
         await File.WriteAllTextAsync(

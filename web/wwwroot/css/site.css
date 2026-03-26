@@ -72,12 +72,25 @@ code {
 .app-sidebar {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 1.5rem;
   padding: 1.5rem;
   background: var(--app-sidebar-bg);
   border-right: 1px solid var(--app-border);
   backdrop-filter: blur(18px);
+}
+
+.brand-link {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  text-decoration: none;
+}
+
+.brand-logo {
+  display: block;
+  width: min(220px, 100%);
+  height: auto;
 }
 
 .app-content {
@@ -257,11 +270,6 @@ code {
   box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.08);
 }
 
-.sidebar-footer {
-  padding-top: 1rem;
-  border-top: 1px solid var(--app-border);
-}
-
 .form-input {
   width: 100%;
   border: 1px solid rgba(148, 163, 184, 0.36);
@@ -421,6 +429,17 @@ code {
   color: var(--app-text-muted);
 }
 
+.table-link {
+  color: var(--app-primary-strong);
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.table-link:hover {
+  color: var(--app-accent);
+  text-decoration: underline;
+}
+
 .timeline-shell pre {
   overflow: auto;
   white-space: pre-wrap;
@@ -430,6 +449,38 @@ code {
   color: #e2e8f0;
   width: 100%;
   box-sizing: border-box;
+}
+
+.modal-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.52);
+  backdrop-filter: blur(4px);
+}
+
+.modal-card {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 34rem);
+  border: 1px solid var(--app-border);
+  border-radius: 24px;
+  background: var(--app-panel);
+  padding: 1.5rem;
+  box-shadow: var(--app-shadow);
+}
+
+.upload-modal-card {
+  width: min(100%, 42rem);
 }
 
 .theme-picker {

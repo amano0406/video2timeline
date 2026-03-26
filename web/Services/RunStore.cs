@@ -59,12 +59,6 @@ public sealed class RunStore(AppPaths paths, SettingsStore settingsStore, ScanSe
         CreateJobCommand command,
         CancellationToken cancellationToken = default)
     {
-        var activeRun = await GetActiveRunAsync(cancellationToken);
-        if (activeRun is not null)
-        {
-            throw new InvalidOperationException($"Another run is already active: {activeRun.JobId}");
-        }
-
         var settings = await settingsStore.LoadAsync(cancellationToken);
         var outputRoot = settings.OutputRoots
             .FirstOrDefault(root => root.Enabled && string.Equals(root.Id, command.OutputRootId, StringComparison.OrdinalIgnoreCase))
@@ -289,6 +283,47 @@ public sealed class RunStore(AppPaths paths, SettingsStore settingsStore, ScanSe
         return deletedCount;
     }
 
+    public async Task<int> CleanupOrphanedUploadSessionsAsync(TimeSpan retention, CancellationToken cancellationToken = default)
+    {
+        if (!Directory.Exists(paths.UploadsRoot))
+        {
+            return 0;
+        }
+
+        var referencedDirectories = await GetReferencedUploadDirectoriesAsync(cancellationToken);
+        var deletedCount = 0;
+        var now = DateTimeOffset.Now;
+
+        foreach (var sessionDirectory in Directory.EnumerateDirectories(paths.UploadsRoot, "session-*", SearchOption.TopDirectoryOnly))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var fullDirectory = Path.GetFullPath(sessionDirectory);
+            if (!IsSubdirectoryOf(fullDirectory, Path.GetFullPath(paths.UploadsRoot)))
+            {
+                continue;
+            }
+
+            if (referencedDirectories.Contains(fullDirectory))
+            {
+                continue;
+            }
+
+            var sessionCreatedAt = await ReadUploadSessionCreatedAtAsync(sessionDirectory, cancellationToken)
+                ?? new DateTimeOffset(Directory.GetCreationTimeUtc(sessionDirectory));
+
+            if (retention > TimeSpan.Zero && now - sessionCreatedAt < retention)
+            {
+                continue;
+            }
+
+            Directory.Delete(fullDirectory, recursive: true);
+            deletedCount += 1;
+        }
+
+        return deletedCount;
+    }
+
     public async Task<string?> BuildRunArchiveAsync(string jobId, CancellationToken cancellationToken = default)
     {
         var runDirectory = await FindRunDirectoryAsync(jobId, cancellationToken);
@@ -444,7 +479,6 @@ public sealed class RunStore(AppPaths paths, SettingsStore settingsStore, ScanSe
 
         return summaries
             .OrderByDescending(static row => row.CreatedAt)
-            .Take(25)
             .ToList();
     }
 
@@ -608,6 +642,49 @@ public sealed class RunStore(AppPaths paths, SettingsStore settingsStore, ScanSe
         }
 
         return deletedCount;
+    }
+
+    private async Task<HashSet<string>> GetReferencedUploadDirectoriesAsync(CancellationToken cancellationToken)
+    {
+        var referenced = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var settings = await settingsStore.LoadAsync(cancellationToken);
+
+        foreach (var root in settings.OutputRoots.Where(static root => root.Enabled))
+        {
+            if (!Directory.Exists(root.Path))
+            {
+                continue;
+            }
+
+            foreach (var runDirectory in Directory.EnumerateDirectories(root.Path, "run-*", SearchOption.TopDirectoryOnly))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var request = await ReadJsonAsync<JobRequestDocument>(Path.Combine(runDirectory, "request.json"), cancellationToken);
+                if (request is null)
+                {
+                    continue;
+                }
+
+                foreach (var directory in request.InputItems
+                    .Where(static item => string.Equals(item.SourceKind, "upload", StringComparison.OrdinalIgnoreCase))
+                    .Select(static item => item.UploadedPath)
+                    .Where(static path => !string.IsNullOrWhiteSpace(path))
+                    .Select(static path => Path.GetDirectoryName(path!))
+                    .Where(static path => !string.IsNullOrWhiteSpace(path)))
+                {
+                    referenced.Add(Path.GetFullPath(directory!));
+                }
+            }
+        }
+
+        return referenced;
+    }
+
+    private async Task<DateTimeOffset?> ReadUploadSessionCreatedAtAsync(string sessionDirectory, CancellationToken cancellationToken)
+    {
+        var path = Path.Combine(sessionDirectory, "session.json");
+        var session = await ReadJsonAsync<UploadSessionDocument>(path, cancellationToken);
+        return ParseTimestamp(session?.CreatedAt);
     }
 
     private static DateTimeOffset? ParseTimestamp(string? value)

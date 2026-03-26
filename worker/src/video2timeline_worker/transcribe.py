@@ -18,6 +18,32 @@ def resolve_model_name_for_quality(value: str | None) -> str:
     return "large-v3" if normalize_processing_quality(value) == "high" else "medium"
 
 
+def _is_cuda_oom(exc: Exception) -> bool:
+    message = str(exc or "").lower()
+    return "out of memory" in message or "cuda failed with error out of memory" in message
+
+
+def _initial_batch_size(device: str, processing_quality: str) -> int:
+    if device != "cuda":
+        return 8
+    return 4 if normalize_processing_quality(processing_quality) == "high" else 16
+
+
+def _candidate_batch_sizes(initial: int) -> list[int]:
+    values = [initial, 12, 8, 6, 4, 2, 1]
+    rows: list[int] = []
+    for value in values:
+        if value <= initial and value not in rows:
+            rows.append(value)
+    return rows
+
+
+def _clear_torch_memory(torch_module: Any) -> None:
+    gc.collect()
+    if torch_module.cuda.is_available():
+        torch_module.cuda.empty_cache()
+
+
 @dataclass
 class SegmentRecord:
     index: int
@@ -103,13 +129,31 @@ def _render_markdown(
         f"- Effective compute mode: `{metadata.get('effective_compute_mode', metadata['device'])}`",
         f"- GPU available: `{metadata.get('gpu_available', False)}`",
         f"- Compute type: `{metadata['compute_type']}`",
+        f"- Batch size: `{metadata.get('batch_size', '')}`",
         f"- Alignment used: `{metadata['alignment_used']}`",
         f"- Diarization used: `{metadata['diarization_used']}`",
         f"- Diarization error: `{metadata.get('diarization_error') or ''}`",
         "",
-        "## Transcript",
+        "## Warnings",
         "",
     ]
+    warnings = [
+        str(item).strip()
+        for item in metadata.get("transcription_warnings", [])
+        if str(item).strip()
+    ]
+    if warnings:
+        for warning in warnings:
+            lines.append(f"- {warning}")
+    else:
+        lines.append("_None._")
+    lines.extend(
+        [
+            "",
+            "## Transcript",
+            "",
+        ]
+    )
     if not segments:
         lines.append("_No transcript segments generated._")
         return "\n".join(lines) + "\n"
@@ -165,27 +209,81 @@ def transcribe_audio(
     device = "cuda" if requested_compute_mode == "gpu" and gpu_available else "cpu"
     effective_compute_mode = "gpu" if device == "cuda" else "cpu"
     compute_type = "float16" if device == "cuda" else "int8"
-    batch_size = 16 if device == "cuda" else 8
     resolved_quality = normalize_processing_quality(
         processing_quality or settings.get("processingQuality")
     )
     model_name = resolve_model_name_for_quality(resolved_quality)
     language = "ja"
-    try:
-        model = whisperx.load_model(
-            model_name, device, compute_type=compute_type, language=language
+
+    transcription_warnings: list[str] = []
+    batch_size = _initial_batch_size(device, resolved_quality)
+
+    def load_transcription_model(target_device: str, target_compute_type: str) -> Any:
+        return whisperx.load_model(
+            model_name,
+            target_device,
+            compute_type=target_compute_type,
+            language=language,
         )
+
+    try:
+        model = load_transcription_model(device, compute_type)
     except Exception:
         if device == "cuda":
             compute_type = "int8_float16"
-            batch_size = 8
-            model = whisperx.load_model(
-                model_name, device, compute_type=compute_type, language=language
+            batch_size = min(batch_size, 8)
+            transcription_warnings.append(
+                "Primary GPU compute type failed to load; using int8_float16 instead."
             )
+            model = load_transcription_model(device, compute_type)
         else:
             raise
+
     audio = whisperx.load_audio(str(trimmed_audio_path))
-    result = model.transcribe(audio, batch_size=batch_size, language=language)
+    result: dict[str, Any] | None = None
+    last_error: Exception | None = None
+
+    for candidate_batch_size in _candidate_batch_sizes(batch_size):
+        try:
+            result = model.transcribe(
+                audio,
+                batch_size=candidate_batch_size,
+                language=language,
+            )
+            batch_size = candidate_batch_size
+            if candidate_batch_size != _initial_batch_size(device, resolved_quality):
+                transcription_warnings.append(
+                    f"GPU batch size was reduced to {candidate_batch_size} to fit available memory."
+                )
+            break
+        except RuntimeError as exc:
+            if device != "cuda" or not _is_cuda_oom(exc):
+                raise
+            last_error = exc
+            _clear_torch_memory(torch)
+            continue
+
+    if result is None and device == "cuda":
+        try:
+            del model
+        except Exception:
+            pass
+        _clear_torch_memory(torch)
+        device = "cpu"
+        effective_compute_mode = "cpu"
+        compute_type = "int8"
+        batch_size = 4
+        transcription_warnings.append(
+            "GPU memory was insufficient for this audio; transcription fell back to CPU."
+        )
+        model = load_transcription_model(device, compute_type)
+        result = model.transcribe(audio, batch_size=batch_size, language=language)
+
+    if result is None:
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError("Transcription did not produce a result.")
+
     aligned_segments = result.get("segments", [])
     alignment_used = False
     try:
@@ -238,10 +336,12 @@ def transcribe_audio(
         "effective_compute_mode": effective_compute_mode,
         "gpu_available": gpu_available,
         "compute_type": compute_type,
+        "batch_size": batch_size,
         "language": language,
         "alignment_used": alignment_used,
         "diarization_used": diarization_used,
         "diarization_error": diarization_error,
+        "transcription_warnings": transcription_warnings,
         "segments": [asdict(record) for record in records],
         "speaker_turns": diarization_rows or [],
     }
@@ -251,7 +351,5 @@ def transcribe_audio(
     )
     write_text(transcript_dir / "raw.md", _render_markdown(source_name, payload, records))
     del model
-    gc.collect()
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
+    _clear_torch_memory(torch)
     return payload

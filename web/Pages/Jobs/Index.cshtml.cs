@@ -11,9 +11,16 @@ public sealed class IndexModel(
     LanguageService languageService,
     JsonLocalizationService localizer) : PageModel
 {
+    private const int PageSize = 30;
+
     public IReadOnlyList<RunSummary> RecentRuns { get; private set; } = [];
 
     public RunSummary? ActiveRun { get; private set; }
+
+    [BindProperty(SupportsGet = true)]
+    public int PageNumber { get; set; } = 1;
+
+    public int TotalPages { get; private set; }
 
     [TempData]
     public string? StatusMessage { get; set; }
@@ -59,8 +66,14 @@ public sealed class IndexModel(
         ActiveRun = runs.FirstOrDefault(static run =>
             string.Equals(run.State, "pending", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(run.State, "running", StringComparison.OrdinalIgnoreCase));
+
+        var totalCount = runs.Count;
+        TotalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)PageSize));
+        PageNumber = Math.Clamp(PageNumber, 1, TotalPages);
+
         RecentRuns = runs
-            .Where(run => ActiveRun is null || !string.Equals(run.JobId, ActiveRun.JobId, StringComparison.OrdinalIgnoreCase))
+            .Skip((PageNumber - 1) * PageSize)
+            .Take(PageSize)
             .ToList();
     }
 

@@ -701,7 +701,8 @@ def process_job(job_dir: Path | None = None) -> bool:
         _write_status(job_dir, status)
         batch_count, timeline_index_path = _llm_export(job_dir, completed_items)
 
-        result.state = "completed" if status.videos_failed == 0 else "completed"
+        has_failures = status.videos_failed > 0
+        result.state = "failed" if has_failures else "completed"
         result.processed_count = status.videos_done
         result.skipped_count = status.videos_skipped
         result.error_count = status.videos_failed
@@ -710,9 +711,9 @@ def process_job(job_dir: Path | None = None) -> bool:
         result.warnings = warnings
         _write_result(job_dir, result)
 
-        status.state = "completed"
-        status.current_stage = "completed"
-        status.message = "Job completed."
+        status.state = "failed" if has_failures else "completed"
+        status.current_stage = "failed" if has_failures else "completed"
+        status.message = "Job finished with errors." if has_failures else "Job completed."
         status.warnings = warnings
         status.current_media = None
         status.current_media_elapsed_sec = 0.0
@@ -730,7 +731,7 @@ def process_job(job_dir: Path | None = None) -> bool:
         _write_status(job_dir, status)
         append_log(
             log_path,
-            f"[{now_iso()}] Job completed with {status.videos_done} processed, {status.videos_skipped} skipped, {status.videos_failed} failed.",
+            f"[{now_iso()}] Job {'finished with errors' if has_failures else 'completed'} with {status.videos_done} processed, {status.videos_skipped} skipped, {status.videos_failed} failed.",
         )
         return True
     except Exception as exc:

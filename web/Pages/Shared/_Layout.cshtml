@@ -28,6 +28,11 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - video2timeline</title>
+    <meta name="theme-color" content="#ffffff" />
+    <link rel="icon" type="image/svg+xml" href="~/favicon.svg" asp-append-version="true" />
+    <link rel="icon" type="image/x-icon" href="~/favicon.ico" asp-append-version="true" />
+    <link rel="apple-touch-icon" href="~/apple-touch-icon.png" asp-append-version="true" />
+    <link rel="manifest" href="~/manifest.webmanifest" asp-append-version="true" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
@@ -36,8 +41,11 @@
         <aside class="app-sidebar">
             <div class="space-y-6">
                 <div class="space-y-3">
-                    <a href="/" class="block">
-                        <div class="text-2xl font-semibold tracking-tight text-slate-950">video2timeline</div>
+                    <a href="/" class="brand-link">
+                        <img src="~/brand/logo-horizontal.svg"
+                             asp-append-version="true"
+                             alt="video2timeline"
+                             class="brand-logo" />
                     </a>
                 </div>
 
@@ -51,11 +59,6 @@
                 </nav>
             </div>
 
-            <div class="sidebar-footer space-y-4">
-                <div class="status-pill @(settingsReady ? "status-pill-ready" : "status-pill-blocked")">
-                    @(settingsReady ? L("layout.ready") : L("layout.setup_required"))
-                </div>
-            </div>
         </aside>
 
         <div class="app-content">

@@ -9,6 +9,11 @@ public sealed class IndexModel(SetupStateService setupStateService, RunStore run
     public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
     {
         var setupState = await setupStateService.GetAsync(cancellationToken);
+        if (!setupState.HasSelectedLanguage)
+        {
+            return RedirectToPage("/Language");
+        }
+
         if (!setupState.IsReady)
         {
             return RedirectToPage("/Settings");

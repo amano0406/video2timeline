@@ -10,8 +10,6 @@ public sealed class NewModel(
     LanguageService languageService,
     JsonLocalizationService localizer) : PageModel
 {
-    public RunSummary? ActiveRun { get; private set; }
-
     [BindProperty]
     public List<IFormFile> UploadFiles { get; set; } = [];
 
@@ -21,20 +19,13 @@ public sealed class NewModel(
     [TempData]
     public string? StatusMessage { get; set; }
 
-    public async Task OnGetAsync(CancellationToken cancellationToken)
+    public Task OnGetAsync(CancellationToken cancellationToken)
     {
-        await LoadPageAsync(cancellationToken);
+        return Task.CompletedTask;
     }
 
     public async Task<IActionResult> OnPostExecuteAsync(CancellationToken cancellationToken)
     {
-        await LoadPageAsync(cancellationToken);
-        if (ActiveRun is not null)
-        {
-            ModelState.AddModelError(string.Empty, L("jobs.new.blocked"));
-            return Page();
-        }
-
         var files = UploadFiles.Concat(UploadDirectoryFiles).ToList();
         if (files.Count == 0)
         {
@@ -51,11 +42,6 @@ public sealed class NewModel(
             cancellationToken);
 
         return RedirectToPage("/Runs/Details", new { id = created.JobId });
-    }
-
-    private async Task LoadPageAsync(CancellationToken cancellationToken)
-    {
-        ActiveRun = await runStore.GetActiveRunAsync(cancellationToken);
     }
 
     private string L(string key) => localizer.Get(languageService.Resolve(Request), key);

@@ -20,7 +20,7 @@ public sealed class SettingsStore(AppPaths paths)
                 stream,
                 _jsonOptions,
                 cancellationToken);
-            return Normalize(loaded ?? new AppSettingsDocument());
+            return Normalize(loaded ?? new AppSettingsDocument(), hasPersistedSettings: true);
         }
 
         if (File.Exists(paths.RuntimeDefaultsPath))
@@ -104,7 +104,7 @@ public sealed class SettingsStore(AppPaths paths)
             cancellationToken);
     }
 
-    private AppSettingsDocument Normalize(AppSettingsDocument value)
+    private AppSettingsDocument Normalize(AppSettingsDocument value, bool hasPersistedSettings = false)
     {
         value.InputRoots =
         [
@@ -147,6 +147,8 @@ public sealed class SettingsStore(AppPaths paths)
             { Length: > 0 } language => language,
             _ => "en",
         };
+
+        value.LanguageSelected = value.LanguageSelected || hasPersistedSettings;
 
         return value;
     }

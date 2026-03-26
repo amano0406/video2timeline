@@ -24,22 +24,6 @@
         </section>
     }
 
-    @if (Model.ActiveRun is not null)
-    {
-        <section class="panel accent-panel">
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div class="space-y-2">
-                    <p class="eyebrow">@L("jobs.active.title")</p>
-                    <h2 class="section-title">@Model.ActiveRun.JobId</h2>
-                    <p class="text-sm text-slate-600">
-                        @L("jobs.active.description")
-                    </p>
-                </div>
-                <a class="btn-secondary" href="/runs/@Model.ActiveRun.JobId">@L("jobs.active.open_details")</a>
-            </div>
-        </section>
-    }
-
     <form method="post" enctype="multipart/form-data" class="space-y-6" id="new-job-form">
         @if (!ViewContext.ModelState.IsValid)
         {
@@ -75,34 +59,36 @@
             @L("jobs.new.cache_notice")
         </section>
 
-        <section class="panel subtle-panel hidden" id="upload-progress-panel">
-            <div class="space-y-3">
-                <div class="flex items-center justify-between gap-3">
-                    <div>
-                        <p class="eyebrow">@L("jobs.new.upload_eyebrow")</p>
-                        <h2 class="section-title" id="upload-progress-title">@L("jobs.new.upload_idle")</h2>
-                    </div>
-                    <div class="badge-chip" id="upload-progress-percent">0%</div>
-                </div>
-                <div class="h-3 overflow-hidden rounded-full bg-slate-200">
-                    <div class="h-full rounded-full bg-slate-900 transition-all" id="upload-progress-bar" style="width:0%"></div>
-                </div>
-                <p class="text-sm text-slate-600" id="upload-progress-message">@L("jobs.new.upload_waiting")</p>
-            </div>
-        </section>
-
         <div class="flex flex-wrap items-center gap-3">
             <a class="btn-secondary" href="/jobs">@L("common.cancel")</a>
-            @if (Model.ActiveRun is null)
-            {
-                <button asp-page-handler="Execute" class="btn-primary" id="execute-job-button">@L("jobs.new.execute")</button>
-            }
-            else
-            {
-                <button type="button" disabled class="btn-disabled">@L("jobs.new.blocked")</button>
-            }
+            <button asp-page-handler="Execute" class="btn-primary" id="execute-job-button">@L("jobs.new.execute")</button>
         </div>
     </form>
+</section>
+
+<section class="modal-shell hidden" id="upload-overlay" aria-hidden="true" role="dialog" aria-modal="true" aria-live="polite">
+    <div class="modal-backdrop"></div>
+    <div class="modal-card upload-modal-card">
+        <div class="space-y-4">
+            <div class="flex items-center justify-between gap-3">
+                <div>
+                    <p class="eyebrow">@L("jobs.new.upload_eyebrow")</p>
+                    <h2 class="section-title" id="upload-progress-title">@L("jobs.new.upload_idle")</h2>
+                </div>
+                <div class="badge-chip" id="upload-progress-percent">0%</div>
+            </div>
+
+            <div class="h-3 overflow-hidden rounded-full bg-slate-200">
+                <div class="h-full rounded-full bg-slate-900 transition-all" id="upload-progress-bar" style="width:0%"></div>
+            </div>
+
+            <p class="text-sm text-slate-600" id="upload-progress-message">@L("jobs.new.upload_waiting")</p>
+
+            <div class="flex justify-end">
+                <button type="button" class="btn-secondary" id="upload-cancel-button">@L("jobs.new.upload_cancel")</button>
+            </div>
+        </div>
+    </div>
 </section>
 
 @section Scripts
@@ -113,13 +99,14 @@
             const filesInput = document.getElementById("upload-files-input");
             const directoryInput = document.getElementById("upload-directory-input");
             const executeButton = document.getElementById("execute-job-button");
-            const progressPanel = document.getElementById("upload-progress-panel");
+            const progressPanel = document.getElementById("upload-overlay");
             const progressTitle = document.getElementById("upload-progress-title");
             const progressMessage = document.getElementById("upload-progress-message");
             const progressPercent = document.getElementById("upload-progress-percent");
             const progressBar = document.getElementById("upload-progress-bar");
+            const cancelButton = document.getElementById("upload-cancel-button");
 
-            if (!form || !filesInput || !directoryInput || !executeButton || !progressPanel || !progressTitle || !progressMessage || !progressPercent || !progressBar) {
+            if (!form || !filesInput || !directoryInput || !executeButton || !progressPanel || !progressTitle || !progressMessage || !progressPercent || !progressBar || !cancelButton) {
                 return;
             }
 
@@ -130,14 +117,22 @@
                 uploadCreatingJob: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(L("jobs.new.upload_creating_job"))),
                 uploadCompleted: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(L("jobs.new.upload_completed"))),
                 uploadFailed: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(L("jobs.new.upload_failed"))),
+                uploadCancelled: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(L("jobs.new.upload_cancelled"))),
+                uploadCanceling: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(L("jobs.new.upload_canceling"))),
                 execute: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(L("jobs.new.execute"))),
-                currentFile: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(L("jobs.new.upload_current_file")))
+                currentFile: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(L("jobs.new.upload_current_file"))),
+                leaveWarning: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(L("jobs.new.upload_leave_warning")))
             };
 
             const chunkUploadEnabled = window.fetch && window.FormData && window.Blob;
             if (!chunkUploadEnabled) {
                 return;
             }
+
+            let activeSessionId = null;
+            let uploadController = null;
+            let uploadInProgress = false;
+            let cancelRequested = false;
 
             const collectFiles = () => {
                 const directFiles = Array.from(filesInput.files || []);
@@ -149,19 +144,89 @@
                 if (window.video2timelineSetBusy) {
                     window.video2timelineSetBusy(busy);
                 }
+                uploadInProgress = busy;
                 filesInput.disabled = busy;
                 directoryInput.disabled = busy;
                 executeButton.disabled = busy;
                 executeButton.textContent = busy ? messages.uploadRunning : messages.execute;
+                cancelButton.disabled = !busy;
+                progressPanel.classList.toggle("hidden", !busy);
+                progressPanel.setAttribute("aria-hidden", busy ? "false" : "true");
+            };
+
+            const cleanupSession = async () => {
+                if (!activeSessionId) {
+                    return;
+                }
+
+                const sessionId = activeSessionId;
+                activeSessionId = null;
+                try {
+                    await fetch(`/api/uploads/sessions/${sessionId}`, {
+                        method: "DELETE",
+                        headers: { "Accept": "application/json" }
+                    });
+                } catch {
+                }
             };
 
             const updateProgress = (percent, title, message) => {
-                progressPanel.classList.remove("hidden");
                 progressTitle.textContent = title;
                 progressMessage.textContent = message;
                 progressPercent.textContent = `${percent}%`;
                 progressBar.style.width = `${percent}%`;
             };
+
+            const isEditableTarget = (target) => {
+                if (!(target instanceof HTMLElement)) {
+                    return false;
+                }
+
+                if (target.isContentEditable) {
+                    return true;
+                }
+
+                const tagName = target.tagName.toLowerCase();
+                return tagName === "input" || tagName === "textarea" || tagName === "select";
+            };
+
+            cancelButton.addEventListener("click", async () => {
+                if (!uploadInProgress) {
+                    return;
+                }
+
+                cancelRequested = true;
+                cancelButton.disabled = true;
+                updateProgress(0, messages.uploadCanceling, messages.uploadCanceling);
+                uploadController?.abort();
+                await cleanupSession();
+                setBusy(false);
+                updateProgress(0, messages.uploadCancelled, messages.uploadCancelled);
+            });
+
+            window.addEventListener("beforeunload", (event) => {
+                if (!uploadInProgress) {
+                    return;
+                }
+
+                event.preventDefault();
+                event.returnValue = messages.leaveWarning;
+            });
+
+            document.addEventListener("keydown", (event) => {
+                if (!uploadInProgress) {
+                    return;
+                }
+
+                const isBackspaceNavigation = event.key === "Backspace" && !isEditableTarget(event.target);
+                const isHistoryNavigation = event.altKey && (event.key === "ArrowLeft" || event.key === "ArrowRight");
+                const isRefresh = event.key === "F5" || ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "r");
+
+                if (isBackspaceNavigation || isHistoryNavigation || isRefresh) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+            }, true);
 
             form.addEventListener("submit", async (event) => {
                 event.preventDefault();
@@ -175,16 +240,22 @@
                 const totalBytes = selectedFiles.reduce((sum, file) => sum + file.size, 0);
                 let uploadedBytes = 0;
 
+                cancelRequested = false;
+                uploadController = new AbortController();
                 setBusy(true);
                 updateProgress(0, messages.uploadPreparing, messages.uploadPreparing);
 
                 try {
-                    const sessionResponse = await fetch("/api/uploads/sessions", { method: "POST" });
+                    const sessionResponse = await fetch("/api/uploads/sessions", {
+                        method: "POST",
+                        signal: uploadController.signal
+                    });
                     if (!sessionResponse.ok) {
                         throw new Error(await sessionResponse.text());
                     }
 
                     const session = await sessionResponse.json();
+                    activeSessionId = session.sessionId;
                     const chunkSize = session.chunkSizeBytes;
                     const uploadedItems = [];
 
@@ -192,6 +263,7 @@
                         const registerResponse = await fetch(`/api/uploads/sessions/${session.sessionId}/files`, {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
+                            signal: uploadController.signal,
                             body: JSON.stringify({
                                 originalName: file.webkitRelativePath || file.name,
                                 sizeBytes: file.size
@@ -212,6 +284,7 @@
                             const chunkResponse = await fetch(`/api/uploads/sessions/${session.sessionId}/files/${registered.fileId}/chunks/${chunkIndex}`, {
                                 method: "POST",
                                 headers: { "Content-Type": "application/octet-stream" },
+                                signal: uploadController.signal,
                                 body: chunk
                             });
                             if (!chunkResponse.ok) {
@@ -229,7 +302,8 @@
                     }
 
                     const completeResponse = await fetch(`/api/uploads/sessions/${session.sessionId}/complete`, {
-                        method: "POST"
+                        method: "POST",
+                        signal: uploadController.signal
                     });
                     if (!completeResponse.ok) {
                         throw new Error(await completeResponse.text());
@@ -252,11 +326,17 @@
 
                     const created = await jobResponse.json();
                     updateProgress(100, messages.uploadCompleted, messages.uploadCompleted);
+                    activeSessionId = null;
                     window.location.href = `/runs/${created.jobId}`;
                 } catch (error) {
-                    const text = error instanceof Error ? error.message : String(error);
-                    updateProgress(0, messages.uploadFailed, text);
+                    if (!cancelRequested) {
+                        await cleanupSession();
+                        const text = error instanceof Error ? error.message : String(error);
+                        updateProgress(0, messages.uploadFailed, text);
+                    }
+
                     setBusy(false);
+                    uploadController = null;
                 }
             });
         })();

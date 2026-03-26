@@ -40,7 +40,7 @@ if exist ".env" (
 )
 echo.
 
-call :confirm_yes "Continue with uninstall? [y/n]: "
+call :confirm_yes "Continue with uninstall? (y/n): "
 if errorlevel 1 (
   echo Uninstall canceled.
   exit /b 1
@@ -48,7 +48,7 @@ if errorlevel 1 (
 
 echo.
 echo Stopping and removing Docker resources...
-docker compose -f docker-compose.yml -f docker-compose.gpu.yml down --rmi local --remove-orphans
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml down --rmi local --remove-orphans <nul
 if errorlevel 1 (
   echo Docker cleanup failed.
   exit /b 1
@@ -67,7 +67,7 @@ echo.
 echo Saved app data volume:
 echo   !APPDATA_VOLUME!
 echo This includes your saved Hugging Face token and app settings.
-call :confirm_yes "Delete saved token and settings too? [y/n]: "
+call :confirm_yes "Delete saved token and settings too? (y/n): "
 if not errorlevel 1 (
   call :remove_volume_if_exists "!APPDATA_VOLUME!"
   if errorlevel 1 exit /b 1
@@ -80,7 +80,7 @@ echo Docker resources removed.
 
 if exist ".env" (
   echo.
-  call :confirm_yes "Delete local .env as well? [y/n]: "
+  call :confirm_yes "Delete local .env as well? (y/n): "
   if not errorlevel 1 (
     del /q ".env"
     echo Deleted .env
@@ -97,21 +97,22 @@ exit /b 0
 set "VOLUME_NAME=%~1"
 if not defined VOLUME_NAME exit /b 0
 
-for /f %%V in ('docker volume ls --format "{{.Name}}" ^| findstr /I /X /C:"!VOLUME_NAME!"') do (
-  docker volume rm "%%V" >nul
-  if errorlevel 1 (
-    echo Failed to remove Docker volume: %%V
-    exit /b 1
-  )
-  echo Removed Docker volume: %%V
+docker volume inspect "!VOLUME_NAME!" >nul 2>&1
+if errorlevel 1 exit /b 0
+
+docker volume rm "!VOLUME_NAME!" >nul
+if errorlevel 1 (
+  echo Failed to remove Docker volume: !VOLUME_NAME!
+  exit /b 1
 )
+echo Removed Docker volume: !VOLUME_NAME!
 
 exit /b 0
 
 :confirm_yes
 set "PROMPT_TEXT=%~1"
-set "CONFIRM_VALUE="
-set /p "CONFIRM_VALUE=%PROMPT_TEXT%"
-if /I "%CONFIRM_VALUE%"=="Y" exit /b 0
-if /I "%CONFIRM_VALUE%"=="YES" exit /b 0
+echo %PROMPT_TEXT%
+choice /c yn /n
+if errorlevel 2 exit /b 1
+if errorlevel 1 exit /b 0
 exit /b 1

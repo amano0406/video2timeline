@@ -51,14 +51,14 @@ confirm_yes() {
   esac
 }
 
-if ! confirm_yes "Continue with uninstall? [y/n]: "; then
+if ! confirm_yes "Continue with uninstall? (y/n): "; then
   echo "Uninstall canceled."
   exit 1
 fi
 
 echo
 echo "Stopping and removing Docker resources..."
-docker compose -f docker-compose.yml -f docker-compose.gpu.yml down --rmi local --remove-orphans
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml down --rmi local --remove-orphans </dev/null
 
 remove_volume_if_exists() {
   local volume_name="$1"
@@ -77,7 +77,7 @@ echo
 echo "Saved app data volume:"
 echo "  ${APPDATA_VOLUME}"
 echo "This includes your saved Hugging Face token and app settings."
-if confirm_yes "Delete saved token and settings too? [y/n]: "; then
+if confirm_yes "Delete saved token and settings too? (y/n): "; then
   remove_volume_if_exists "${APPDATA_VOLUME}"
   echo "Deleted saved app data volume."
 else
@@ -88,7 +88,7 @@ echo "Docker resources removed."
 
 if [[ -f ".env" ]]; then
   echo
-  if confirm_yes "Delete local .env as well? [y/n]: "; then
+  if confirm_yes "Delete local .env as well? (y/n): "; then
     rm -f ".env"
     echo "Deleted .env"
   else
