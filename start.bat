@@ -2,10 +2,14 @@
 setlocal EnableExtensions EnableDelayedExpansion
 
 cd /d "%~dp0"
+set "DOCKER_DESKTOP_URL=https://docs.docker.com/desktop/setup/install/windows-install/"
 
 where docker >nul 2>&1
 if errorlevel 1 (
   echo Docker Desktop is not installed or docker.exe is not on PATH.
+  echo Download and install Docker Desktop here:
+  echo   %DOCKER_DESKTOP_URL%
+  if /I not "%VIDEO2TIMELINE_SKIP_HELP_LINK%"=="1" start "" "%DOCKER_DESKTOP_URL%" >nul 2>&1
   echo Install Docker Desktop, start it, and try again.
   exit /b 1
 )
@@ -13,6 +17,9 @@ if errorlevel 1 (
 docker info >nul 2>&1
 if errorlevel 1 (
   echo Docker Desktop is installed but the Docker engine is not ready.
+  echo Docker Desktop setup guide:
+  echo   %DOCKER_DESKTOP_URL%
+  if /I not "%VIDEO2TIMELINE_SKIP_HELP_LINK%"=="1" start "" "%DOCKER_DESKTOP_URL%" >nul 2>&1
   echo Start Docker Desktop and wait until it shows the engine is running, then try again.
   exit /b 1
 )

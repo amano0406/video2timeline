@@ -2,15 +2,26 @@
 set -euo pipefail
 
 cd "$(dirname "$0")"
+DOCKER_DESKTOP_URL="https://docs.docker.com/desktop/setup/install/mac-install/"
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "Docker Desktop is not installed or docker is not on PATH."
+  echo "Download and install Docker Desktop here:"
+  echo "  ${DOCKER_DESKTOP_URL}"
+  if [ "${VIDEO2TIMELINE_SKIP_HELP_LINK:-0}" != "1" ]; then
+    open "${DOCKER_DESKTOP_URL}" || true
+  fi
   echo "Install Docker Desktop, start it, and try again."
   exit 1
 fi
 
 if ! docker info >/dev/null 2>&1; then
   echo "Docker Desktop is installed but the Docker engine is not ready."
+  echo "Docker Desktop setup guide:"
+  echo "  ${DOCKER_DESKTOP_URL}"
+  if [ "${VIDEO2TIMELINE_SKIP_HELP_LINK:-0}" != "1" ]; then
+    open "${DOCKER_DESKTOP_URL}" || true
+  fi
   echo "Start Docker Desktop and wait until the engine is running, then try again."
   exit 1
 fi
