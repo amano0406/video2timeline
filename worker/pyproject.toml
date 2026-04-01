@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "video2timeline-worker"
-version = "0.3.1"
+version = "0.3.2"
 description = "Worker pipeline for video2timeline."
 requires-python = ">=3.11"
 
