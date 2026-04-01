@@ -4,7 +4,7 @@ This document explains what `video2timeline` downloads or expects at runtime and
 
 ## Public Release Contract
 
-The current public release line is `video2timeline v0.3.0 Tech Preview`.
+The current public release line is `video2timeline v0.3.3 Tech Preview`.
 
 - baseline support is Windows + Docker Desktop + CPU mode
 - macOS is an experimental source-based path

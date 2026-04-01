@@ -4,7 +4,7 @@ This document defines the first public GitHub Release line for `video2timeline`.
 
 ## Release Line
 
-- public line: `video2timeline v0.3.0 Tech Preview`
+- current public line example: `video2timeline v0.3.3 Tech Preview`
 - tag format: `v0.x.y`
 - first tag: `v0.3.0`
 - initial support contract:
@@ -55,29 +55,29 @@ The Windows release bundle must contain a top folder named `video2timeline-v0.x.
 5. Build the Windows bundle:
 
    ```powershell
-   .\scripts\build-release-bundle.ps1 -Version 0.3.0 -OutputDir .\release\v0.3.0
+   .\scripts\build-release-bundle.ps1 -Version 0.3.3 -OutputDir .\release\v0.3.3
    ```
 
 6. Verify these files exist:
-   - `release\v0.3.0\video2timeline-windows-local.zip`
-   - `release\v0.3.0\SHA256SUMS.txt`
+   - `release\v0.3.3\video2timeline-windows-local.zip`
+   - `release\v0.3.3\SHA256SUMS.txt`
 7. Create the annotated tag:
 
    ```powershell
-   git tag -a v0.3.0 -m "video2timeline v0.3.0"
+   git tag -a v0.3.3 -m "video2timeline v0.3.3"
    ```
 
 8. Push `main` and the tag:
 
    ```powershell
    git push origin main
-   git push origin v0.3.0
+   git push origin v0.3.3
    ```
 
 9. Create the GitHub Release manually:
    - repository: `https://github.com/amano0406/video2timeline`
-   - title: `video2timeline v0.3.0 Tech Preview`
-   - tag: `v0.3.0`
+   - title: `video2timeline v0.3.3 Tech Preview`
+   - tag: `v0.3.3`
    - latest release: enabled
    - pre-release: disabled
 10. Paste the release note template from `docs/RELEASE_NOTES_TEMPLATE.md`.

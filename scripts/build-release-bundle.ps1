@@ -179,13 +179,29 @@ if (Test-Path -LiteralPath $checksumPath) {
 New-Item -ItemType Directory -Path $bundleRoot | Out-Null
 Copy-ReleaseFiles -RepoRoot $repoRoot -DestinationRoot $bundleRoot
 
+Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-[System.IO.Compression.ZipFile]::CreateFromDirectory(
-    $bundleStageRoot,
-    $zipPath,
-    [System.IO.Compression.CompressionLevel]::Optimal,
-    $false
-)
+$zipStream = [System.IO.File]::Open($zipPath, [System.IO.FileMode]::Create)
+try {
+    $archive = New-Object System.IO.Compression.ZipArchive($zipStream, [System.IO.Compression.ZipArchiveMode]::Create, $false)
+    try {
+        $normalizedStageRoot = (Resolve-Path $bundleStageRoot).Path.TrimEnd('\', '/')
+        foreach ($file in Get-ChildItem -LiteralPath $bundleStageRoot -Recurse -File) {
+            $entryName = $file.FullName.Substring($normalizedStageRoot.Length + 1).Replace('\', '/')
+            [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+                $archive,
+                $file.FullName,
+                $entryName,
+                [System.IO.Compression.CompressionLevel]::Optimal) | Out-Null
+        }
+    }
+    finally {
+        $archive.Dispose()
+    }
+}
+finally {
+    $zipStream.Dispose()
+}
 
 $hash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
 Set-Content -LiteralPath $checksumPath -Value "$hash  video2timeline-windows-local.zip"
