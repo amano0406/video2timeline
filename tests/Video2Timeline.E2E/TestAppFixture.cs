@@ -63,6 +63,8 @@ internal sealed class TestAppFixture : IAsyncDisposable
 
     public string DuplicateSkippedMediaId => "sample-media-duplicate";
 
+    public string LegacyDuplicateProgressJobId => "job-e2e-legacy-duplicate";
+
     public string DuplicateUploadPath => Path.Combine(TempRoot, "fixtures", "already-processed.mp4");
 
     public static async Task<TestAppFixture> StartAsync()
@@ -97,6 +99,7 @@ internal sealed class TestAppFixture : IAsyncDisposable
         await SeedFailedRunWithoutTimelineAsync(outputRoot);
         await SeedDuplicateCatalogEntryAsync(outputRoot, tempRoot);
         await SeedDuplicateSkippedRunAsync(outputRoot);
+        await SeedLegacyDuplicateProgressRunAsync(outputRoot);
 
         var appDllPath = Path.Combine(repoRoot, "web", "bin", "Debug", "net10.0", "Video2Timeline.Web.dll");
         var startInfo = new ProcessStartInfo("dotnet", $"\"{appDllPath}\" --urls http://127.0.0.1:{port}")
@@ -160,6 +163,23 @@ internal sealed class TestAppFixture : IAsyncDisposable
             root.GetProperty("compute_mode").GetString() ?? "",
             root.GetProperty("processing_quality").GetString() ?? "",
             root.GetProperty("reprocess_duplicates").GetBoolean());
+    }
+
+    public async Task SetTokenAsync(string? token)
+    {
+        var tokenPath = Path.Combine(TempRoot, "app-data", "secrets", "huggingface.token");
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            if (File.Exists(tokenPath))
+            {
+                File.Delete(tokenPath);
+            }
+
+            return;
+        }
+
+        Directory.CreateDirectory(Path.GetDirectoryName(tokenPath)!);
+        await File.WriteAllTextAsync(tokenPath, token);
     }
 
     private async Task WaitUntilReadyAsync()
@@ -705,6 +725,135 @@ internal sealed class TestAppFixture : IAsyncDisposable
         await File.WriteAllTextAsync(Path.Combine(runRoot, "result.json"), JsonSerializer.Serialize(result, jsonOptions));
         await File.WriteAllTextAsync(Path.Combine(runRoot, "manifest.json"), JsonSerializer.Serialize(manifest, jsonOptions));
         await File.WriteAllTextAsync(Path.Combine(runRoot, "logs", "worker.log"), "[info] duplicate timeline reused\n");
+    }
+
+    private static async Task SeedLegacyDuplicateProgressRunAsync(string outputRoot)
+    {
+        const string jobId = "job-e2e-legacy-duplicate";
+        const string mediaId = "sample-media-legacy-duplicate";
+
+        var runRoot = Path.Combine(outputRoot, jobId);
+        Directory.CreateDirectory(runRoot);
+        Directory.CreateDirectory(Path.Combine(runRoot, "llm"));
+        Directory.CreateDirectory(Path.Combine(runRoot, "logs"));
+
+        var duplicateBytes = Encoding.UTF8.GetBytes("video2timeline-e2e-legacy-duplicate-seed");
+        var referencedTimelinePath = Path.Combine(outputRoot, "job-e2e-completed", "media", "sample-media-001", "timeline", "timeline.md")
+            .Replace("\\", "/");
+
+        var request = new
+        {
+            schema_version = 1,
+            job_id = jobId,
+            created_at = "2026-03-23T10:30:00+09:00",
+            output_root_id = "runs",
+            output_root_path = outputRoot.Replace("\\", "/"),
+            profile = "quality-first",
+            compute_mode = "cpu",
+            processing_quality = "standard",
+            reprocess_duplicates = false,
+            token_enabled = false,
+            input_items = new object[]
+            {
+                new
+                {
+                    input_id = "upload-0001",
+                    source_kind = "upload",
+                    source_id = "uploads",
+                    original_path = "legacy-duplicate.mp4",
+                    display_name = "legacy-duplicate.mp4",
+                    size_bytes = duplicateBytes.Length,
+                    uploaded_path = (string?)null,
+                },
+            },
+        };
+
+        var status = new
+        {
+            schema_version = 1,
+            job_id = jobId,
+            state = "completed",
+            current_stage = "completed",
+            message = "Legacy duplicate run completed.",
+            warnings = Array.Empty<string>(),
+            current_media = (string?)null,
+            videos_total = 1,
+            videos_done = 0,
+            videos_skipped = 1,
+            videos_failed = 0,
+            total_duration_sec = 18.0,
+            processed_duration_sec = 18.0,
+            current_media_elapsed_sec = 0.0,
+            current_stage_elapsed_sec = 0.0,
+            estimated_remaining_sec = 0.0,
+            progress_percent = 0.0,
+            started_at = "2026-03-23T10:30:00+09:00",
+            updated_at = "2026-03-23T10:30:04+09:00",
+            completed_at = "2026-03-23T10:30:04+09:00",
+        };
+
+        var result = new
+        {
+            schema_version = 1,
+            job_id = jobId,
+            state = "completed",
+            run_dir = runRoot.Replace("\\", "/"),
+            output_root_id = "runs",
+            output_root_path = outputRoot.Replace("\\", "/"),
+            processed_count = 0,
+            skipped_count = 1,
+            error_count = 0,
+            batch_count = 0,
+            timeline_index_path = (string?)null,
+            warnings = Array.Empty<string>(),
+        };
+
+        var manifest = new
+        {
+            schema_version = 1,
+            job_id = jobId,
+            generated_at = "2026-03-23T10:30:04+09:00",
+            items = new object[]
+            {
+                new
+                {
+                    input_id = "upload-0001",
+                    source_kind = "upload",
+                    original_path = "legacy-duplicate.mp4",
+                    file_name = "legacy-duplicate.mp4",
+                    size_bytes = duplicateBytes.Length,
+                    duration_seconds = 18.0,
+                    sha256 = "legacy-duplicate-sha256",
+                    duplicate_status = "duplicate_skip",
+                    duplicate_of = referencedTimelinePath,
+                    media_id = mediaId,
+                    status = "skipped_duplicate",
+                    container_name = "mp4",
+                    video_codec = "h264",
+                    audio_codec = "aac",
+                    width = 1920,
+                    height = 1080,
+                    frame_rate = 30.0,
+                    audio_channels = 2,
+                    audio_sample_rate = 48000,
+                    has_video = true,
+                    has_audio = true,
+                    captured_at = "2026-03-23T10:30:00+09:00",
+                    processing_wall_seconds = 0.0,
+                    stage_elapsed_seconds = new { },
+                },
+            },
+        };
+
+        var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
+        await File.WriteAllTextAsync(Path.Combine(runRoot, "request.json"), JsonSerializer.Serialize(request, jsonOptions));
+        await File.WriteAllTextAsync(Path.Combine(runRoot, "status.json"), JsonSerializer.Serialize(status, jsonOptions));
+        await File.WriteAllTextAsync(Path.Combine(runRoot, "result.json"), JsonSerializer.Serialize(result, jsonOptions));
+        await File.WriteAllTextAsync(Path.Combine(runRoot, "manifest.json"), JsonSerializer.Serialize(manifest, jsonOptions));
+        await File.WriteAllTextAsync(Path.Combine(runRoot, "RUN_INFO.md"), "# Run Info\n");
+        await File.WriteAllTextAsync(Path.Combine(runRoot, "TRANSCRIPTION_INFO.md"), "# Transcription Info\n");
+        await File.WriteAllTextAsync(Path.Combine(runRoot, "NOTICE.md"), "# Notice\n");
+        await File.WriteAllTextAsync(Path.Combine(runRoot, "logs", "worker.log"), "[info] legacy duplicate timeline reused\n");
     }
 
     private static async Task SeedFailedRunWithoutTimelineAsync(string outputRoot)

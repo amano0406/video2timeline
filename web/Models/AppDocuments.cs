@@ -295,7 +295,7 @@ public sealed class SetupState
 
     public bool HasSelectedLanguage { get; set; }
 
-    public bool IsReady => HasToken && TermsConfirmed;
+    public bool IsReady => HasSelectedLanguage;
 }
 
 public sealed class ScannedVideoItem

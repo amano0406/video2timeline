@@ -100,7 +100,7 @@ public sealed class SettingsStore(AppPaths paths)
         await SaveAsync(
             settings,
             token,
-            replaceToken: !string.IsNullOrWhiteSpace(token),
+            replaceToken: true,
             cancellationToken);
     }
 

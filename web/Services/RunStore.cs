@@ -481,6 +481,8 @@ public sealed class RunStore(AppPaths paths, SettingsStore settingsStore, ScanSe
                 continue;
             }
 
+            var catalogIndex = LoadCatalogIndex(root.Path);
+
             foreach (var runDirectory in EnumerateJobDirectories(root.Path))
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -494,7 +496,8 @@ public sealed class RunStore(AppPaths paths, SettingsStore settingsStore, ScanSe
                 var manifest = await ReadJsonAsync<ManifestDocument>(Path.Combine(runDirectory, "manifest.json"), cancellationToken);
                 var totalSizeBytes = manifest?.Items.Sum(static item => item.SizeBytes) ?? 0L;
                 var totalDurationSec = manifest?.Items.Sum(static item => item.DurationSeconds) ?? 0.0;
-                var hasDownloadableArchive = ResolveTimelineItems(runDirectory, request, manifest).Count > 0;
+                var hasDownloadableArchive = ResolveTimelineItems(runDirectory, request, manifest, catalogIndex).Count > 0;
+                var completedCount = status.VideosDone + status.VideosSkipped + status.VideosFailed;
 
                 summaries.Add(new RunSummary
                 {
@@ -517,7 +520,7 @@ public sealed class RunStore(AppPaths paths, SettingsStore settingsStore, ScanSe
                     ProgressPercent = status.ProgressPercent > 0
                         ? status.ProgressPercent
                         : status.VideosTotal > 0
-                            ? Math.Round(status.VideosDone * 100.0 / status.VideosTotal, 1)
+                            ? Math.Round(completedCount * 100.0 / status.VideosTotal, 1)
                             : 0,
                     HasDownloadableArchive = hasDownloadableArchive,
                     UpdatedAt = status.UpdatedAt,
@@ -735,9 +738,10 @@ public sealed class RunStore(AppPaths paths, SettingsStore settingsStore, ScanSe
     private static List<TimelineMediaItem> ResolveTimelineItems(
         string runDirectory,
         JobRequestDocument? request,
-        ManifestDocument? manifest)
+        ManifestDocument? manifest,
+        Dictionary<string, CatalogRow>? catalogIndex = null)
     {
-        var catalogIndex = LoadCatalogIndex(request?.OutputRootPath);
+        catalogIndex ??= LoadCatalogIndex(request?.OutputRootPath);
         var timelineItems = new List<TimelineMediaItem>();
         foreach (var item in manifest?.Items?.Where(static item => !string.IsNullOrWhiteSpace(item.MediaId)) ?? [])
         {

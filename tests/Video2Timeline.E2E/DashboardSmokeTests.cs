@@ -49,6 +49,16 @@ public sealed class DashboardSmokeTests : PageTest
     }
 
     [TestMethod]
+    public async Task Settings_DoesNotExpose_SavedTokenValue()
+    {
+        await Page.GotoAsync($"{_fixture.BaseUrl}/settings");
+
+        await Expect(Page.GetByLabel("Hugging Face Token")).ToHaveValueAsync(string.Empty);
+        var html = await Page.ContentAsync();
+        Assert.IsFalse(html.Contains("hf_test_token_value", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     public async Task Settings_Localizes_SavedModels_Section_In_Japanese()
     {
         await Page.GotoAsync($"{_fixture.BaseUrl}/settings?lang=ja");
@@ -132,6 +142,17 @@ public sealed class DashboardSmokeTests : PageTest
         await Expect(row).ToContainTextAsync("1 / 1");
         await Expect(row).ToContainTextAsync("Processed 0 | Reused 1 | Errors 0");
         await Expect(row.GetByRole(AriaRole.Link, new() { Name = "ZIP" })).ToBeVisibleAsync();
+    }
+
+    [TestMethod]
+    public async Task Jobs_Page_FallsBack_To_TerminalCounts_When_Legacy_Progress_IsMissing()
+    {
+        await Page.GotoAsync($"{_fixture.BaseUrl}/jobs");
+
+        var row = Page.Locator("tr").Filter(new() { HasText = _fixture.LegacyDuplicateProgressJobId });
+        await Expect(row).ToContainTextAsync(_fixture.LegacyDuplicateProgressJobId);
+        await Expect(row).ToContainTextAsync("1 / 1");
+        await Expect(row).ToContainTextAsync("Processed 0 | Reused 1 | Errors 0");
     }
 
     [TestMethod]
@@ -299,6 +320,23 @@ public sealed class DashboardSmokeTests : PageTest
 
         await Page.GotoAsync($"{_fixture.BaseUrl}/runs/{_fixture.CompletedJobId}/{_fixture.CompletedMediaId}");
         await Expect(Page).ToHaveURLAsync(new Regex($".*/jobs/{_fixture.CompletedJobId}/{_fixture.CompletedMediaId}$"));
+    }
+
+    [TestMethod]
+    public async Task Root_DoesNotRequire_Token_After_Language_IsSelected()
+    {
+        try
+        {
+            await _fixture.SetTokenAsync(null);
+
+            await Page.GotoAsync($"{_fixture.BaseUrl}/");
+
+            await Expect(Page).ToHaveURLAsync(new Regex(".*/jobs/new$"));
+        }
+        finally
+        {
+            await _fixture.SetTokenAsync("hf_test_token_value");
+        }
     }
 
     [TestMethod]

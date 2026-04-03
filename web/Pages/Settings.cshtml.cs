@@ -55,12 +55,6 @@ public sealed class SettingsModel(
 
     public async Task<IActionResult> OnPostSaveAsync(CancellationToken cancellationToken)
     {
-        var hasExistingToken = await settingsStore.HasTokenAsync(cancellationToken);
-        if (!hasExistingToken && string.IsNullOrWhiteSpace(Token))
-        {
-            ModelState.AddModelError(nameof(Token), L("settings.token_required"));
-        }
-
         WorkerCapability = await workerCapabilityService.GetAsync(cancellationToken);
         if (string.Equals(ComputeMode, "gpu", StringComparison.OrdinalIgnoreCase) && !WorkerCapability.GpuAvailable)
         {
@@ -99,14 +93,8 @@ public sealed class SettingsModel(
         await settingsStore.SaveAsync(settings, cancellationToken: cancellationToken);
 
         await LoadPageAsync(cancellationToken);
-        if (SetupState.IsReady)
-        {
-            TempData["StatusMessage"] = L("settings.save_success");
-            return RedirectToPage("/Jobs/New");
-        }
-
-        StatusMessage = L("settings.save_pending");
-        return Page();
+        TempData["StatusMessage"] = L("settings.save_success");
+        return RedirectToPage("/Jobs/New");
     }
 
     public async Task<IActionResult> OnPostClearModelCacheAsync(CancellationToken cancellationToken)
@@ -125,7 +113,7 @@ public sealed class SettingsModel(
         ModelStatuses = Snapshot.Models;
         ModelCache = await modelCacheService.GetSnapshotAsync(cancellationToken);
         WorkerCapability = await workerCapabilityService.GetAsync(cancellationToken);
-        Token = await settingsStore.ReadTokenAsync(cancellationToken) ?? "";
+        Token = "";
         var settings = await settingsStore.LoadAsync(cancellationToken);
         ComputeMode = settings.ComputeMode;
         if (!WorkerCapability.GpuAvailable && string.Equals(ComputeMode, "gpu", StringComparison.OrdinalIgnoreCase))
