@@ -85,6 +85,8 @@ Most users only need:
 - `README.md`
 - `TRANSCRIPTION_INFO.md`
 - `timelines/<captured-datetime>.md`
+- `FAILURE_REPORT.md` when some items fail or warnings need to be preserved
+- `logs/worker.log` when the job includes failure or warning artifacts
 
 Example:
 
@@ -98,6 +100,20 @@ video2timeline-export.zip
 ```
 
 Each markdown file inside `timelines/` is one video timeline.
+
+If a job finishes with partial success, the ZIP still downloads. In that case it contains successful timelines plus the failure report and worker log.
+
+## Reuse And Rerun Behavior
+
+When you upload files that were already processed before, the app checks for reusable results first.
+
+- if reusable timelines are still available, the app asks whether to reuse them or reprocess the files
+- reused results remain visible from the new job details screen
+- from job details, you can rerun the same source files with either:
+  - the same settings as the original job
+  - the current settings in `Settings`
+
+This makes it easier to rerun a job after changing compute mode, quality, or diarization-related setup.
 
 ## Internal Working Files vs ZIP Output
 
@@ -141,6 +157,8 @@ Then:
 6. create a new job
 7. wait for processing to finish
 8. download the ZIP package
+
+During processing, the jobs list and job details screens show elapsed time and an estimated remaining time. The estimate becomes more useful as more completed jobs are available for comparison.
 
 The start script tries to open an app-style window with Google Chrome, Microsoft Edge, Brave, or Chromium. If none of those are available, it falls back to a normal browser window.
 
