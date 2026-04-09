@@ -3,7 +3,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-COMPOSE_PROJECT="video2timeline"
+COMPOSE_PROJECT="timelineforvideo"
 APPDATA_VOLUME="${COMPOSE_PROJECT}_app-data"
 OUTPUTS_VOLUME="${COMPOSE_PROJECT}_outputs"
 UPLOADS_VOLUME="${COMPOSE_PROJECT}_uploads"
@@ -22,7 +22,7 @@ if ! docker info >/dev/null 2>&1; then
 fi
 
 echo
-echo "video2timeline uninstall"
+echo "TimelineForVideo uninstall"
 echo
 echo "This will remove:"
 echo "  - Docker containers for this project"

@@ -1,10 +1,10 @@
 # Manual Release Guide
 
-This document defines the first public GitHub Release line for `video2timeline`.
+This document defines the first public GitHub Release line for `TimelineForVideo`.
 
 ## Release Line
 
-- current public line example: `video2timeline v0.3.3 Tech Preview`
+- current public line example: `TimelineForVideo v0.3.3 Tech Preview`
 - tag format: `v0.x.y`
 - first tag: `v0.3.0`
 - initial support contract:
@@ -27,7 +27,7 @@ This document defines the first public GitHub Release line for `video2timeline`.
 
 Attach these files to the GitHub Release:
 
-- `video2timeline-windows-local.zip`
+- `TimelineForVideo-windows-local.zip`
 - `SHA256SUMS.txt`
 
 Do not attach:
@@ -39,7 +39,7 @@ Do not attach:
 - tests
 - private screenshots or reports
 
-The Windows release bundle must contain a top folder named `video2timeline-v0.x.y`.
+The Windows release bundle must contain a top folder named `TimelineForVideo-v0.x.y`.
 
 ## Manual Release Procedure
 
@@ -59,12 +59,12 @@ The Windows release bundle must contain a top folder named `video2timeline-v0.x.
    ```
 
 6. Verify these files exist:
-   - `release\v0.3.3\video2timeline-windows-local.zip`
+   - `release\v0.3.3\TimelineForVideo-windows-local.zip`
    - `release\v0.3.3\SHA256SUMS.txt`
 7. Create the annotated tag:
 
    ```powershell
-   git tag -a v0.3.3 -m "video2timeline v0.3.3"
+   git tag -a v0.3.3 -m "TimelineForVideo v0.3.3"
    ```
 
 8. Push `main` and the tag:
@@ -75,28 +75,28 @@ The Windows release bundle must contain a top folder named `video2timeline-v0.x.
    ```
 
 9. Create the GitHub Release manually:
-   - repository: `https://github.com/amano0406/video2timeline`
-   - title: `video2timeline v0.3.3 Tech Preview`
+   - repository: the current GitHub repository for `TimelineForVideo`
+   - title: `TimelineForVideo v0.3.3 Tech Preview`
    - tag: `v0.3.3`
    - latest release: enabled
    - pre-release: disabled
 10. Paste the release note template from `docs/RELEASE_NOTES_TEMPLATE.md`.
 11. Attach:
-   - `video2timeline-windows-local.zip`
+   - `TimelineForVideo-windows-local.zip`
    - `SHA256SUMS.txt`
 12. Publish the release.
 13. After publish, verify:
-   - `https://github.com/amano0406/video2timeline/releases/latest`
-   - `https://github.com/amano0406/video2timeline/releases/latest/download/video2timeline-windows-local.zip`
+   - the `releases/latest` URL resolves to the new tag
+   - the direct Windows download URL for `TimelineForVideo-windows-local.zip` works
 
 ## LP URL Policy
 
 - before the first release, the fallback URL is:
-  - `https://github.com/amano0406/video2timeline`
+  - the current GitHub repository home
 - after the first release, the LP primary CTA should use:
-  - `https://github.com/amano0406/video2timeline/releases/latest`
+  - the `releases/latest` page for the current GitHub repository
 - the direct-download URL should be kept for future use, but not used as the initial LP primary CTA:
-  - `https://github.com/amano0406/video2timeline/releases/latest/download/video2timeline-windows-local.zip`
+  - the current repository's `releases/latest/download/TimelineForVideo-windows-local.zip` URL
 
 The first LP CTA should send users to the release page, not directly to the asset, so they can read requirements and known limitations first.
 
@@ -106,7 +106,7 @@ Reasonable first automation scope:
 
 - validate version/tag format
 - run build and test steps
-- build `video2timeline-windows-local.zip`
+- build `TimelineForVideo-windows-local.zip`
 - generate `SHA256SUMS.txt`
 - create a draft GitHub Release
 

@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Features;
-using Video2Timeline.Web.Infrastructure;
-using Video2Timeline.Web.Models;
-using Video2Timeline.Web.Services;
+using TimelineForVideo.Web.Infrastructure;
+using TimelineForVideo.Web.Models;
+using TimelineForVideo.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 var appPaths = new AppPaths(builder.Configuration);
@@ -21,10 +21,10 @@ builder.Services.AddSingleton(appPaths);
 builder.Services.AddSingleton<AppInstanceService>();
 builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionPath))
-    .SetApplicationName("video2timeline");
+    .SetApplicationName("TimelineForVideo");
 builder.Services.AddAntiforgery(options =>
 {
-    options.Cookie.Name = "video2timeline.antiforgery";
+    options.Cookie.Name = "timelineforvideo.antiforgery";
 });
 builder.Services.Configure<FormOptions>(options =>
 {

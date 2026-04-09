@@ -1,10 +1,10 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Video2Timeline.Web.Models;
-using Video2Timeline.Web.Services;
+using TimelineForVideo.Web.Models;
+using TimelineForVideo.Web.Services;
 
-namespace Video2Timeline.Web.Pages.Jobs;
+namespace TimelineForVideo.Web.Pages.Jobs;
 
 public sealed class IndexModel(
     RunStore runStore,

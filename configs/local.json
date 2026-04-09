@@ -1,5 +1,5 @@
 {
-  "project_name": "video2timeline",
+  "project_name": "timelineforvideo",
   "source_directories": [
     {
       "name": "videos_primary",
@@ -12,7 +12,7 @@
       "recursive": true
     }
   ],
-  "output_root": "C:\\path\\to\\video2timeline-runs",
+  "output_root": "C:\\path\\to\\TimelineForVideo-runs",
   "video_extensions": [
     ".mp4",
     ".mov",

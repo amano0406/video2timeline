@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Video2Timeline.Web.Services;
+using TimelineForVideo.Web.Services;
 
-namespace Video2Timeline.Web.Pages.Runs;
+namespace TimelineForVideo.Web.Pages.Runs;
 
 public sealed class MediaModel(RunStore runStore) : PageModel
 {

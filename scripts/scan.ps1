@@ -1,6 +1,6 @@
 param(
-    [string]$Config = "C:\apps\video2timeline\configs\local.json",
-    [string]$Output = "C:\apps\video2timeline\runs\discovery.json"
+    [string]$Config = "C:\apps\TimelineForVideo\configs\local.json",
+    [string]$Output = "C:\apps\TimelineForVideo\runs\discovery.json"
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,4 +11,4 @@ $python = if (Test-Path $venvPython) { $venvPython } else { "python" }
 
 $env:PYTHONPATH = Join-Path $root "worker\src"
 
-& $python -m video2timeline_worker scan --config $Config --output $Output
+& $python -m timelineforvideo_worker scan --config $Config --output $Output

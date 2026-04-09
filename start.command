@@ -3,12 +3,14 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 DOCKER_DESKTOP_URL="https://docs.docker.com/desktop/setup/install/mac-install/"
+SKIP_HELP_LINK="${TIMELINEFORVIDEO_SKIP_HELP_LINK:-${VIDEO2TIMELINE_SKIP_HELP_LINK:-0}}"
+SKIP_BROWSER_OPEN="${TIMELINEFORVIDEO_SKIP_BROWSER_OPEN:-${VIDEO2TIMELINE_SKIP_BROWSER_OPEN:-0}}"
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "Docker Desktop is not installed or docker is not on PATH."
   echo "Download and install Docker Desktop here:"
   echo "  ${DOCKER_DESKTOP_URL}"
-  if [ "${VIDEO2TIMELINE_SKIP_HELP_LINK:-0}" != "1" ]; then
+  if [ "${SKIP_HELP_LINK}" != "1" ]; then
     open "${DOCKER_DESKTOP_URL}" || true
   fi
   echo "Install Docker Desktop, start it, and try again."
@@ -19,7 +21,7 @@ if ! docker info >/dev/null 2>&1; then
   echo "Docker Desktop is installed but the Docker engine is not ready."
   echo "Docker Desktop setup guide:"
   echo "  ${DOCKER_DESKTOP_URL}"
-  if [ "${VIDEO2TIMELINE_SKIP_HELP_LINK:-0}" != "1" ]; then
+  if [ "${SKIP_HELP_LINK}" != "1" ]; then
     open "${DOCKER_DESKTOP_URL}" || true
   fi
   echo "Start Docker Desktop and wait until the engine is running, then try again."
@@ -45,7 +47,10 @@ open_app_window() {
   return 1
 }
 
-WEB_PORT="$(read_env_value VIDEO2TIMELINE_WEB_PORT)"
+WEB_PORT="$(read_env_value TIMELINEFORVIDEO_WEB_PORT)"
+if [ -z "${WEB_PORT}" ]; then
+  WEB_PORT="$(read_env_value VIDEO2TIMELINE_WEB_PORT)"
+fi
 if [ -z "${WEB_PORT}" ]; then
   WEB_PORT="38090"
 fi
@@ -66,8 +71,8 @@ for _ in $(seq 1 45); do
   running_services="$(docker compose ps --services --status running || true)"
   if echo "$running_services" | grep -qx "web" && echo "$running_services" | grep -qx "worker"; then
     if curl -fsS "http://localhost:${WEB_PORT}" >/dev/null 2>&1; then
-      echo "video2timeline is ready at http://localhost:${WEB_PORT}"
-      if [ "${VIDEO2TIMELINE_SKIP_BROWSER_OPEN:-0}" = "1" ]; then
+      echo "TimelineForVideo is ready at http://localhost:${WEB_PORT}"
+      if [ "${SKIP_BROWSER_OPEN}" = "1" ]; then
         exit 0
       fi
       if open_app_window "Google Chrome" || open_app_window "Microsoft Edge" || open_app_window "Brave Browser" || open_app_window "Chromium"; then
@@ -81,7 +86,7 @@ for _ in $(seq 1 45); do
   sleep 2
 done
 
-echo "video2timeline did not become ready in time."
+echo "TimelineForVideo did not become ready in time."
 echo
 docker compose ps || true
 echo

@@ -1,4 +1,4 @@
-# video2timeline
+# TimelineForVideo
 
 手元にある動画ファイルを、ChatGPT などの LLM に渡しやすいタイムライン資料へ変換するローカルツールです。
 
@@ -6,7 +6,7 @@
 
 ## Public Release Status
 
-現在の public release 系列は `video2timeline v0.3.3 Tech Preview` です。
+現在の public release 系列は `TimelineForVideo v0.3.3 Tech Preview` です。
 
 現時点の public contract:
 
@@ -92,7 +92,7 @@
 例:
 
 ```text
-video2timeline-export.zip
+TimelineForVideo-export.zip
   README.md
   TRANSCRIPTION_INFO.md
   timelines/
@@ -244,12 +244,12 @@ public release の baseline は CPU mode です。
 
 ```powershell
 $env:PYTHONPATH=".\worker\src"
-python -m video2timeline_worker settings status
-python -m video2timeline_worker settings save --token hf_xxx --terms-confirmed
-python -m video2timeline_worker jobs create --file C:\path\to\clip.mp4
-python -m video2timeline_worker jobs create --directory C:\path\to\folder
-python -m video2timeline_worker jobs list
-python -m video2timeline_worker jobs archive --job-id run-YYYYMMDD-HHMMSS-xxxx
+python -m timelineforvideo_worker settings status
+python -m timelineforvideo_worker settings save --token hf_xxx --terms-confirmed
+python -m timelineforvideo_worker jobs create --file C:\path\to\clip.mp4
+python -m timelineforvideo_worker jobs create --directory C:\path\to\folder
+python -m timelineforvideo_worker jobs list
+python -m timelineforvideo_worker jobs archive --job-id run-YYYYMMDD-HHMMSS-xxxx
 ```
 
 `jobs archive` を使うと、GUI でダウンロードするのと同じような ZIP 形式で出力できます。

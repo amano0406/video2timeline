@@ -1,10 +1,10 @@
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.Json;
-using Video2Timeline.Web.Infrastructure;
-using Video2Timeline.Web.Models;
+using TimelineForVideo.Web.Infrastructure;
+using TimelineForVideo.Web.Models;
 
-namespace Video2Timeline.Web.Services;
+namespace TimelineForVideo.Web.Services;
 
 public sealed class RunStore(AppPaths paths, SettingsStore settingsStore, ScanService scanService)
 {
@@ -699,30 +699,32 @@ public sealed class RunStore(AppPaths paths, SettingsStore settingsStore, ScanSe
         string outputRootPath,
         CancellationToken cancellationToken)
     {
-        var path = Path.Combine(outputRootPath, ".video2timeline", "catalog.jsonl");
         var rows = new Dictionary<string, CatalogRow>(StringComparer.OrdinalIgnoreCase);
-        if (!File.Exists(path))
+        foreach (var path in EnumerateCatalogPaths(outputRootPath))
         {
-            return rows;
-        }
-
-        var lines = await File.ReadAllLinesAsync(path, cancellationToken);
-        foreach (var line in lines)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (string.IsNullOrWhiteSpace(line))
+            if (!File.Exists(path))
             {
                 continue;
             }
 
-            using var document = JsonDocument.Parse(line);
-            var row = ParseCatalogRow(document.RootElement);
-            if (string.IsNullOrWhiteSpace(row.Sha256))
+            var lines = await File.ReadAllLinesAsync(path, cancellationToken);
+            foreach (var line in lines)
             {
-                continue;
-            }
+                cancellationToken.ThrowIfCancellationRequested();
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    continue;
+                }
 
-            rows[row.Sha256] = row;
+                using var document = JsonDocument.Parse(line);
+                var row = ParseCatalogRow(document.RootElement);
+                if (string.IsNullOrWhiteSpace(row.Sha256))
+                {
+                    continue;
+                }
+
+                rows[row.Sha256] = row;
+            }
         }
 
         return rows;
@@ -838,30 +840,38 @@ public sealed class RunStore(AppPaths paths, SettingsStore settingsStore, ScanSe
             return rows;
         }
 
-        var path = Path.Combine(outputRootPath, ".video2timeline", "catalog.jsonl");
-        if (!File.Exists(path))
+        foreach (var path in EnumerateCatalogPaths(outputRootPath))
         {
-            return rows;
-        }
-
-        foreach (var line in File.ReadLines(path))
-        {
-            if (string.IsNullOrWhiteSpace(line))
+            if (!File.Exists(path))
             {
                 continue;
             }
 
-            using var document = JsonDocument.Parse(line);
-            var row = ParseCatalogRow(document.RootElement);
-            if (string.IsNullOrWhiteSpace(row.Sha256))
+            foreach (var line in File.ReadLines(path))
             {
-                continue;
-            }
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    continue;
+                }
 
-            rows[row.Sha256] = row;
+                using var document = JsonDocument.Parse(line);
+                var row = ParseCatalogRow(document.RootElement);
+                if (string.IsNullOrWhiteSpace(row.Sha256))
+                {
+                    continue;
+                }
+
+                rows[row.Sha256] = row;
+            }
         }
 
         return rows;
+    }
+
+    private static IEnumerable<string> EnumerateCatalogPaths(string outputRootPath)
+    {
+        yield return Path.Combine(outputRootPath, ".timelineforvideo", "catalog.jsonl");
+        yield return Path.Combine(outputRootPath, ".video2timeline", "catalog.jsonl");
     }
 
     private static CatalogRow ParseCatalogRow(JsonElement payload) =>

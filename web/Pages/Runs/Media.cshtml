@@ -1,8 +1,8 @@
 @page "/jobs/{jobId}/{mediaId}"
-@model Video2Timeline.Web.Pages.Runs.MediaModel
-@using Video2Timeline.Web.Infrastructure
-@inject Video2Timeline.Web.Services.LanguageService LanguageService
-@inject Video2Timeline.Web.Services.JsonLocalizationService Localizer
+@model TimelineForVideo.Web.Pages.Runs.MediaModel
+@using TimelineForVideo.Web.Infrastructure
+@inject TimelineForVideo.Web.Services.LanguageService LanguageService
+@inject TimelineForVideo.Web.Services.JsonLocalizationService Localizer
 @{
     var lang = LanguageService.Resolve(ViewContext.HttpContext.Request);
     string L(string key) => Localizer.Get(lang, key);

@@ -3,7 +3,7 @@ setlocal EnableExtensions EnableDelayedExpansion
 
 cd /d "%~dp0"
 
-set "COMPOSE_PROJECT=video2timeline"
+set "COMPOSE_PROJECT=timelineforvideo"
 set "APPDATA_VOLUME=%COMPOSE_PROJECT%_app-data"
 set "OUTPUTS_VOLUME=%COMPOSE_PROJECT%_outputs"
 set "UPLOADS_VOLUME=%COMPOSE_PROJECT%_uploads"
@@ -25,7 +25,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo video2timeline uninstall
+echo TimelineForVideo uninstall
 echo.
 echo This will remove:
 echo   - Docker containers for this project

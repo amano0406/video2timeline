@@ -1,4 +1,4 @@
-namespace Video2Timeline.Web.Services;
+namespace TimelineForVideo.Web.Services;
 
 public sealed class AppInstanceService
 {

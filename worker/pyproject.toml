@@ -3,9 +3,9 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "video2timeline-worker"
+name = "timelineforvideo-worker"
 version = "0.3.3"
-description = "Worker pipeline for video2timeline."
+description = "Worker pipeline for TimelineForVideo."
 requires-python = ">=3.11"
 
 [tool.setuptools]

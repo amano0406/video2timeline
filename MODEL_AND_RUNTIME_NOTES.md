@@ -1,10 +1,10 @@
 # Model and Runtime Notes
 
-This document explains what `video2timeline` downloads or expects at runtime and what users should know before running the app locally.
+This document explains what `TimelineForVideo` downloads or expects at runtime and what users should know before running the app locally.
 
 ## Public Release Contract
 
-The current public release line is `video2timeline v0.3.3 Tech Preview`.
+The current public release line is `TimelineForVideo v0.3.3 Tech Preview`.
 
 - baseline support is Windows + Docker Desktop + CPU mode
 - macOS is an experimental source-based path
@@ -13,7 +13,7 @@ The current public release line is `video2timeline v0.3.3 Tech Preview`.
 
 ## Models Used by the Worker
 
-`video2timeline` uses a local-first pipeline and downloads model/data assets only when they are actually needed.
+`TimelineForVideo` uses a local-first pipeline and downloads model/data assets only when they are actually needed.
 
 Current main components:
 

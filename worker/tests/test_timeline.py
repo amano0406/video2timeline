@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from video2timeline_worker.timeline import render_timeline
+from timelineforvideo_worker.timeline import render_timeline
 
 
 class TimelineTests(unittest.TestCase):

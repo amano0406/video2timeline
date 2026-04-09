@@ -5,7 +5,7 @@ using System.Text.Json;
 using Microsoft.Playwright;
 
 var repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
-var tempRoot = Path.Combine(Path.GetTempPath(), $"video2timeline-docshots-{Guid.NewGuid():N}");
+var tempRoot = Path.Combine(Path.GetTempPath(), $"TimelineForVideo-docshots-{Guid.NewGuid():N}");
 Directory.CreateDirectory(tempRoot);
 
 var appDataRoot = Path.Combine(tempRoot, "app-data");
@@ -23,7 +23,7 @@ await File.WriteAllTextAsync(
 await SeedSettingsAsync(appDataRoot, outputRoot);
 await SeedRunsAsync(outputRoot);
 
-var webProjectPath = Path.Combine(repoRoot, "web", "Video2Timeline.Web.csproj");
+var webProjectPath = Path.Combine(repoRoot, "web", "TimelineForVideo.Web.csproj");
 var port = GetFreePort();
 var baseUrl = $"http://127.0.0.1:{port}";
 
@@ -34,17 +34,17 @@ var startInfo = new ProcessStartInfo("dotnet", $"run --project \"{webProjectPath
     RedirectStandardOutput = true,
     RedirectStandardError = true,
 };
-startInfo.Environment["VIDEO2TIMELINE_RUNTIME_DEFAULTS"] = runtimeDefaultsPath;
-startInfo.Environment["VIDEO2TIMELINE_APPDATA_ROOT"] = appDataRoot;
-startInfo.Environment["VIDEO2TIMELINE_UPLOADS_ROOT"] = uploadsRoot;
-startInfo.Environment["VIDEO2TIMELINE_OUTPUTS_ROOT"] = outputRoot;
-startInfo.Environment["VIDEO2TIMELINE_HF_ACCESS_OVERRIDE"] = "authorized";
+startInfo.Environment["TIMELINEFORVIDEO_RUNTIME_DEFAULTS"] = runtimeDefaultsPath;
+startInfo.Environment["TIMELINEFORVIDEO_APPDATA_ROOT"] = appDataRoot;
+startInfo.Environment["TIMELINEFORVIDEO_UPLOADS_ROOT"] = uploadsRoot;
+startInfo.Environment["TIMELINEFORVIDEO_OUTPUTS_ROOT"] = outputRoot;
+startInfo.Environment["TIMELINEFORVIDEO_HF_ACCESS_OVERRIDE"] = "authorized";
 startInfo.Environment["ASPNETCORE_ENVIRONMENT"] = "Development";
 
 var process = new Process { StartInfo = startInfo };
 if (!process.Start())
 {
-    throw new InvalidOperationException("Failed to start video2timeline for documentation screenshots.");
+    throw new InvalidOperationException("Failed to start TimelineForVideo for documentation screenshots.");
 }
 
 try

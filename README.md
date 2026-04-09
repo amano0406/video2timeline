@@ -1,4 +1,4 @@
-# video2timeline
+# TimelineForVideo
 
 Turn video files you already have into timeline markdown packages that are easier to hand to ChatGPT or other LLM tools.
 
@@ -6,7 +6,7 @@ Turn video files you already have into timeline markdown packages that are easie
 
 ## Public Release Status
 
-The current public release line is `video2timeline v0.3.3 Tech Preview`.
+The current public release line is `TimelineForVideo v0.3.3 Tech Preview`.
 
 Current public contract:
 
@@ -91,7 +91,7 @@ Most users only need:
 Example:
 
 ```text
-video2timeline-export.zip
+TimelineForVideo-export.zip
   README.md
   TRANSCRIPTION_INFO.md
   timelines/
@@ -243,12 +243,12 @@ Example:
 
 ```powershell
 $env:PYTHONPATH=".\worker\src"
-python -m video2timeline_worker settings status
-python -m video2timeline_worker settings save --token hf_xxx --terms-confirmed
-python -m video2timeline_worker jobs create --file C:\path\to\clip.mp4
-python -m video2timeline_worker jobs create --directory C:\path\to\folder
-python -m video2timeline_worker jobs list
-python -m video2timeline_worker jobs archive --job-id run-YYYYMMDD-HHMMSS-xxxx
+python -m timelineforvideo_worker settings status
+python -m timelineforvideo_worker settings save --token hf_xxx --terms-confirmed
+python -m timelineforvideo_worker jobs create --file C:\path\to\clip.mp4
+python -m timelineforvideo_worker jobs create --directory C:\path\to\folder
+python -m timelineforvideo_worker jobs list
+python -m timelineforvideo_worker jobs archive --job-id run-YYYYMMDD-HHMMSS-xxxx
 ```
 
 `jobs archive` creates the same reduced ZIP-style handoff package that the GUI downloads.

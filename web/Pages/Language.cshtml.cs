@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Video2Timeline.Web.Services;
+using TimelineForVideo.Web.Services;
 
-namespace Video2Timeline.Web.Pages;
+namespace TimelineForVideo.Web.Pages;
 
 public sealed class LanguageModel(
     SettingsStore settingsStore,

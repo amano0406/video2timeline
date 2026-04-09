@@ -1,4 +1,4 @@
-namespace Video2Timeline.Web.Infrastructure;
+namespace TimelineForVideo.Web.Infrastructure;
 
 public static class JobUrls
 {

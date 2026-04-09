@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 from pathlib import Path
 from unittest.mock import patch
 
-from video2timeline_worker import processor
+from timelineforvideo_worker import processor
 
 
 class ProcessorQueueTests(unittest.TestCase):

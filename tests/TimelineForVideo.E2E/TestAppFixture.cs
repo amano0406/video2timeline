@@ -5,7 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
-namespace Video2Timeline.E2E;
+namespace TimelineForVideo.E2E;
 
 internal sealed class TestAppFixture : IAsyncDisposable
 {
@@ -70,7 +70,7 @@ internal sealed class TestAppFixture : IAsyncDisposable
     public static async Task<TestAppFixture> StartAsync()
     {
         var repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
-        var tempRoot = Path.Combine(Path.GetTempPath(), $"video2timeline-e2e-{Guid.NewGuid():N}");
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"timelineforvideo-e2e-{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempRoot);
 
         var port = GetFreePort();
@@ -101,7 +101,7 @@ internal sealed class TestAppFixture : IAsyncDisposable
         await SeedDuplicateSkippedRunAsync(outputRoot);
         await SeedLegacyDuplicateProgressRunAsync(outputRoot);
 
-        var appDllPath = Path.Combine(repoRoot, "web", "bin", "Debug", "net10.0", "Video2Timeline.Web.dll");
+        var appDllPath = Path.Combine(repoRoot, "web", "bin", "Debug", "net10.0", "TimelineForVideo.Web.dll");
         var startInfo = new ProcessStartInfo("dotnet", $"\"{appDllPath}\" --urls http://127.0.0.1:{port}")
         {
             WorkingDirectory = repoRoot,
@@ -109,11 +109,11 @@ internal sealed class TestAppFixture : IAsyncDisposable
             RedirectStandardOutput = true,
             RedirectStandardError = true,
         };
-        startInfo.Environment["VIDEO2TIMELINE_RUNTIME_DEFAULTS"] = runtimeDefaultsPath;
-        startInfo.Environment["VIDEO2TIMELINE_APPDATA_ROOT"] = appDataRoot;
-        startInfo.Environment["VIDEO2TIMELINE_UPLOADS_ROOT"] = uploadsRoot;
-        startInfo.Environment["VIDEO2TIMELINE_OUTPUTS_ROOT"] = outputRoot;
-        startInfo.Environment["VIDEO2TIMELINE_HF_ACCESS_OVERRIDE"] = "authorized";
+        startInfo.Environment["TIMELINEFORVIDEO_RUNTIME_DEFAULTS"] = runtimeDefaultsPath;
+        startInfo.Environment["TIMELINEFORVIDEO_APPDATA_ROOT"] = appDataRoot;
+        startInfo.Environment["TIMELINEFORVIDEO_UPLOADS_ROOT"] = uploadsRoot;
+        startInfo.Environment["TIMELINEFORVIDEO_OUTPUTS_ROOT"] = outputRoot;
+        startInfo.Environment["TIMELINEFORVIDEO_HF_ACCESS_OVERRIDE"] = "authorized";
         startInfo.Environment["ASPNETCORE_ENVIRONMENT"] = "Development";
 
         var process = new Process { StartInfo = startInfo };
@@ -274,7 +274,7 @@ internal sealed class TestAppFixture : IAsyncDisposable
         Directory.CreateDirectory(Path.Combine(runRoot, "llm"));
         Directory.CreateDirectory(Path.Combine(runRoot, "logs"));
         Directory.CreateDirectory(Path.Combine(runRoot, "media", mediaId, "timeline"));
-        await File.WriteAllBytesAsync(uploadedPath, Encoding.UTF8.GetBytes("video2timeline-e2e-completed-source"));
+        await File.WriteAllBytesAsync(uploadedPath, Encoding.UTF8.GetBytes("timelineforvideo-e2e-completed-source"));
 
         var request = new
         {
@@ -405,11 +405,11 @@ internal sealed class TestAppFixture : IAsyncDisposable
         Directory.CreateDirectory(fixturesRoot);
 
         var duplicatePath = Path.Combine(fixturesRoot, "already-processed.mp4");
-        var duplicateBytes = Encoding.UTF8.GetBytes("video2timeline-e2e-duplicate-seed");
+        var duplicateBytes = Encoding.UTF8.GetBytes("timelineforvideo-e2e-duplicate-seed");
         await File.WriteAllBytesAsync(duplicatePath, duplicateBytes);
 
         var sha256 = Convert.ToHexString(SHA256.HashData(duplicateBytes)).ToLowerInvariant();
-        var catalogDirectory = Path.Combine(outputRoot, ".video2timeline");
+        var catalogDirectory = Path.Combine(outputRoot, ".timelineforvideo");
         Directory.CreateDirectory(catalogDirectory);
 
         var catalogRow = new
@@ -612,7 +612,7 @@ internal sealed class TestAppFixture : IAsyncDisposable
         Directory.CreateDirectory(Path.Combine(runRoot, "llm"));
         Directory.CreateDirectory(Path.Combine(runRoot, "logs"));
 
-        var duplicateBytes = Encoding.UTF8.GetBytes("video2timeline-e2e-duplicate-seed");
+        var duplicateBytes = Encoding.UTF8.GetBytes("timelineforvideo-e2e-duplicate-seed");
         var sha256 = Convert.ToHexString(SHA256.HashData(duplicateBytes)).ToLowerInvariant();
         var referencedTimelinePath = Path.Combine(outputRoot, "job-e2e-completed", "media", "sample-media-001", "timeline", "timeline.md")
             .Replace("\\", "/");
@@ -737,7 +737,7 @@ internal sealed class TestAppFixture : IAsyncDisposable
         Directory.CreateDirectory(Path.Combine(runRoot, "llm"));
         Directory.CreateDirectory(Path.Combine(runRoot, "logs"));
 
-        var duplicateBytes = Encoding.UTF8.GetBytes("video2timeline-e2e-legacy-duplicate-seed");
+        var duplicateBytes = Encoding.UTF8.GetBytes("timelineforvideo-e2e-legacy-duplicate-seed");
         var referencedTimelinePath = Path.Combine(outputRoot, "job-e2e-completed", "media", "sample-media-001", "timeline", "timeline.md")
             .Replace("\\", "/");
 

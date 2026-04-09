@@ -1,7 +1,7 @@
 @page "/settings"
-@model Video2Timeline.Web.Pages.SettingsModel
-@inject Video2Timeline.Web.Services.LanguageService LanguageService
-@inject Video2Timeline.Web.Services.JsonLocalizationService Localizer
+@model TimelineForVideo.Web.Pages.SettingsModel
+@inject TimelineForVideo.Web.Services.LanguageService LanguageService
+@inject TimelineForVideo.Web.Services.JsonLocalizationService Localizer
 @{
     var lang = LanguageService.Resolve(ViewContext.HttpContext.Request);
     var languages = LanguageService.GetSupportedLanguages();

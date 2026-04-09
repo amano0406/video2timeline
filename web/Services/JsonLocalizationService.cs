@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace Video2Timeline.Web.Services;
+namespace TimelineForVideo.Web.Services;
 
 public sealed class JsonLocalizationService(
     IWebHostEnvironment environment,

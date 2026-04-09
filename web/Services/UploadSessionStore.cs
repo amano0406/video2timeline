@@ -1,7 +1,7 @@
 using System.Text.Json;
-using Video2Timeline.Web.Models;
+using TimelineForVideo.Web.Models;
 
-namespace Video2Timeline.Web.Services;
+namespace TimelineForVideo.Web.Services;
 
 public sealed class UploadSessionStore(AppPaths paths, SettingsStore settingsStore)
 {

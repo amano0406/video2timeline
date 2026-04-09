@@ -3,13 +3,17 @@ setlocal EnableExtensions EnableDelayedExpansion
 
 cd /d "%~dp0"
 set "DOCKER_DESKTOP_URL=https://docs.docker.com/desktop/setup/install/windows-install/"
+set "SKIP_HELP_LINK=%TIMELINEFORVIDEO_SKIP_HELP_LINK%"
+if not defined SKIP_HELP_LINK set "SKIP_HELP_LINK=%VIDEO2TIMELINE_SKIP_HELP_LINK%"
+set "SKIP_BROWSER_OPEN=%TIMELINEFORVIDEO_SKIP_BROWSER_OPEN%"
+if not defined SKIP_BROWSER_OPEN set "SKIP_BROWSER_OPEN=%VIDEO2TIMELINE_SKIP_BROWSER_OPEN%"
 
 where docker >nul 2>&1
 if errorlevel 1 (
   echo Docker Desktop is not installed or docker.exe is not on PATH.
   echo Download and install Docker Desktop here:
   echo   %DOCKER_DESKTOP_URL%
-  if /I not "%VIDEO2TIMELINE_SKIP_HELP_LINK%"=="1" start "" "%DOCKER_DESKTOP_URL%" >nul 2>&1
+  if /I not "%SKIP_HELP_LINK%"=="1" start "" "%DOCKER_DESKTOP_URL%" >nul 2>&1
   echo Install Docker Desktop, start it, and try again.
   exit /b 1
 )
@@ -19,7 +23,7 @@ if errorlevel 1 (
   echo Docker Desktop is installed but the Docker engine is not ready.
   echo Docker Desktop setup guide:
   echo   %DOCKER_DESKTOP_URL%
-  if /I not "%VIDEO2TIMELINE_SKIP_HELP_LINK%"=="1" start "" "%DOCKER_DESKTOP_URL%" >nul 2>&1
+  if /I not "%SKIP_HELP_LINK%"=="1" start "" "%DOCKER_DESKTOP_URL%" >nul 2>&1
   echo Start Docker Desktop and wait until it shows the engine is running, then try again.
   exit /b 1
 )
@@ -32,7 +36,8 @@ if not exist ".env" (
 set "WEB_PORT=38090"
 
 for /f "usebackq tokens=1,* delims==" %%A in (".env") do (
-  if /I "%%A"=="VIDEO2TIMELINE_WEB_PORT" set "WEB_PORT=%%B"
+  if /I "%%A"=="TIMELINEFORVIDEO_WEB_PORT" set "WEB_PORT=%%B"
+  if /I "%%A"=="VIDEO2TIMELINE_WEB_PORT" if not defined WEB_PORT set "WEB_PORT=%%B"
 )
 
 echo Starting web and worker containers...
@@ -72,14 +77,14 @@ powershell -NoLogo -NoProfile -Command "Start-Sleep -Seconds 2" >nul 2>&1
 goto wait_loop
 
 :ready
-echo video2timeline is ready at http://localhost:%WEB_PORT%
-if /I "%VIDEO2TIMELINE_SKIP_BROWSER_OPEN%"=="1" exit /b 0
+echo TimelineForVideo is ready at http://localhost:%WEB_PORT%
+if /I "%SKIP_BROWSER_OPEN%"=="1" exit /b 0
 
 powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\open-app-window.ps1" -Url "http://localhost:%WEB_PORT%" -Width 960 -Height 640
 exit /b %ERRORLEVEL%
 
 :failed
-echo video2timeline did not become ready in time.
+echo TimelineForVideo did not become ready in time.
 echo.
 docker compose ps
 echo.

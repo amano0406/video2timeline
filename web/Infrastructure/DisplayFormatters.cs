@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace Video2Timeline.Web.Infrastructure;
+namespace TimelineForVideo.Web.Infrastructure;
 
 public static class DisplayFormatters
 {

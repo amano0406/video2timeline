@@ -1,8 +1,8 @@
 using System.Net;
 using System.Net.Http.Headers;
-using Video2Timeline.Web.Models;
+using TimelineForVideo.Web.Models;
 
-namespace Video2Timeline.Web.Services;
+namespace TimelineForVideo.Web.Services;
 
 public sealed class HuggingFaceAccessService(
     HttpClient httpClient,
@@ -21,7 +21,9 @@ public sealed class HuggingFaceAccessService(
     private const string FlorenceBaseModelId = "florence-2-base";
     private const string TesseractModelId = "tesseract-ocr";
 
-    private readonly string? _overrideState = configuration["VIDEO2TIMELINE_HF_ACCESS_OVERRIDE"];
+    private readonly string? _overrideState =
+        configuration["TIMELINEFORVIDEO_HF_ACCESS_OVERRIDE"] ??
+        configuration["VIDEO2TIMELINE_HF_ACCESS_OVERRIDE"];
 
     public async Task<HuggingFaceAccessSnapshot> GetSnapshotAsync(CancellationToken cancellationToken = default)
     {

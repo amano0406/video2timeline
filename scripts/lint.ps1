@@ -48,5 +48,5 @@ Invoke-CheckedCommand $python -m ruff check worker/src worker/tests
 Invoke-CheckedCommand $python -m ruff format --check worker/src worker/tests
 
 Write-Host "Running .NET lint..."
-Invoke-CheckedCommand dotnet format web/Video2Timeline.Web.csproj --verify-no-changes --verbosity minimal
-Invoke-CheckedCommand dotnet format tests/Video2Timeline.E2E/Video2Timeline.E2E.csproj --verify-no-changes --verbosity minimal
+Invoke-CheckedCommand dotnet format web/TimelineForVideo.Web.csproj --verify-no-changes --verbosity minimal
+Invoke-CheckedCommand dotnet format tests/TimelineForVideo.E2E/TimelineForVideo.E2E.csproj --verify-no-changes --verbosity minimal

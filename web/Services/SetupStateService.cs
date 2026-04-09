@@ -1,6 +1,6 @@
-using Video2Timeline.Web.Models;
+using TimelineForVideo.Web.Models;
 
-namespace Video2Timeline.Web.Services;
+namespace TimelineForVideo.Web.Services;
 
 public sealed class SetupStateService(SettingsStore settingsStore)
 {

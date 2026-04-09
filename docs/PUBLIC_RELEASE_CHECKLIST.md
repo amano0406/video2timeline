@@ -13,7 +13,7 @@ Use this checklist before switching the repository from private to public.
 
 ## Build And Test
 
-- `dotnet build web/Video2Timeline.Web.csproj`
+- `dotnet build web/TimelineForVideo.Web.csproj`
 - `python -m unittest discover worker/tests` with `PYTHONPATH=worker/src`
 - `scripts/test-e2e.ps1`
 - at least one real local smoke run still completes
@@ -35,16 +35,16 @@ Use this checklist before switching the repository from private to public.
 - Japanese README is still consistent with English README
 - sample timeline files reflect the current output shape
 - third-party notices and model/runtime notes match current dependencies
-- the current `video2timeline v0.x.y Tech Preview` wording is consistent where needed
+- the current `TimelineForVideo v0.x.y Tech Preview` wording is consistent where needed
 - `Windows primary / macOS experimental` wording is consistent where needed
 - `Docker Desktop required`, `first-run downloads`, and `GPU best-effort` wording are consistent where needed
 - speaker diarization is clearly described as optional and gated by token + approval
 
 ## Release Package
 
-- `scripts/build-release-bundle.ps1 -Version 0.3.x` produces `video2timeline-windows-local.zip`
+- `scripts/build-release-bundle.ps1 -Version 0.3.x` produces `TimelineForVideo-windows-local.zip`
 - `SHA256SUMS.txt` is generated for the release bundle
-- the bundle top folder is `video2timeline-v0.x.y`
+- the bundle top folder is `TimelineForVideo-v0.x.y`
 - the bundle does not include generated runs, uploads, app-data, tests, or local caches
 
 ## Before Making The Repo Public
@@ -56,7 +56,7 @@ Use this checklist before switching the repository from private to public.
 
 ## Post-Publish Checks
 
-- the GitHub Release title matches the newly published `video2timeline v0.x.y Tech Preview`
+- the GitHub Release title matches the newly published `TimelineForVideo v0.x.y Tech Preview`
 - `releases/latest` resolves to the newly published tag
-- `video2timeline-windows-local.zip` downloads from the release page
-- LP primary CTA can switch to `https://github.com/amano0406/video2timeline/releases/latest`
+- `TimelineForVideo-windows-local.zip` downloads from the release page
+- LP primary CTA can switch to the repository's current `releases/latest` URL

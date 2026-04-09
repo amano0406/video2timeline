@@ -5,8 +5,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from video2timeline_worker.contracts import ManifestItem
-from video2timeline_worker.eta import build_eta_predictor, estimate_remaining_seconds
+from timelineforvideo_worker.contracts import ManifestItem
+from timelineforvideo_worker.eta import build_eta_predictor, estimate_remaining_seconds
 
 
 def _write_run(

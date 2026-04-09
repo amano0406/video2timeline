@@ -1,6 +1,6 @@
 # Security And Safety Notes
 
-`video2timeline` is a local-first desktop-style tool packaged through Docker. It is not a multi-tenant hosted service and it does not attempt to sandbox the host machine.
+`TimelineForVideo` is a local-first desktop-style tool packaged through Docker. It is not a multi-tenant hosted service and it does not attempt to sandbox the host machine.
 
 That changes what matters most for safety.
 

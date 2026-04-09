@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Video2Timeline.Web.Models;
+namespace TimelineForVideo.Web.Models;
 
 public sealed class RootOption
 {

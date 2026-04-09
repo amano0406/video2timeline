@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from video2timeline_worker.fs_utils import write_json_atomic
+from timelineforvideo_worker.fs_utils import write_json_atomic
 
 
 class FsUtilsTests(unittest.TestCase):

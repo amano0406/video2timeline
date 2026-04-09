@@ -3,13 +3,13 @@ param()
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$webProject = Join-Path $repoRoot "web\Video2Timeline.Web.csproj"
-$project = Join-Path $repoRoot "tests\Video2Timeline.E2E\Video2Timeline.E2E.csproj"
+$webProject = Join-Path $repoRoot "web\TimelineForVideo.Web.csproj"
+$project = Join-Path $repoRoot "tests\TimelineForVideo.E2E\TimelineForVideo.E2E.csproj"
 
 dotnet build $webProject
 dotnet build $project
 
-$playwrightScript = Join-Path $repoRoot "tests\Video2Timeline.E2E\bin\Debug\net10.0\playwright.ps1"
+$playwrightScript = Join-Path $repoRoot "tests\TimelineForVideo.E2E\bin\Debug\net10.0\playwright.ps1"
 if (-not (Test-Path $playwrightScript)) {
     throw "Playwright install script not found at $playwrightScript"
 }

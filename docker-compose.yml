@@ -1,4 +1,4 @@
-name: video2timeline
+name: timelineforvideo
 
 services:
   web:
@@ -7,14 +7,14 @@ services:
       dockerfile: docker/web.Dockerfile
     environment:
       ASPNETCORE_URLS: http://+:8080
-      VIDEO2TIMELINE_RUNTIME_DEFAULTS: /app/config/runtime.defaults.json
-      VIDEO2TIMELINE_APPDATA_ROOT: /shared/app-data
-      VIDEO2TIMELINE_UPLOADS_ROOT: /shared/uploads
-      VIDEO2TIMELINE_OUTPUTS_ROOT: /shared/outputs
-      VIDEO2TIMELINE_HF_CACHE_ROOT: /cache/huggingface
-      VIDEO2TIMELINE_TORCH_CACHE_ROOT: /cache/torch
+      TIMELINEFORVIDEO_RUNTIME_DEFAULTS: /app/config/runtime.defaults.json
+      TIMELINEFORVIDEO_APPDATA_ROOT: /shared/app-data
+      TIMELINEFORVIDEO_UPLOADS_ROOT: /shared/uploads
+      TIMELINEFORVIDEO_OUTPUTS_ROOT: /shared/outputs
+      TIMELINEFORVIDEO_HF_CACHE_ROOT: /cache/huggingface
+      TIMELINEFORVIDEO_TORCH_CACHE_ROOT: /cache/torch
     ports:
-      - "${VIDEO2TIMELINE_WEB_PORT}:8080"
+      - "${TIMELINEFORVIDEO_WEB_PORT}:8080"
     volumes:
       - app-data:/shared/app-data
       - outputs:/shared/outputs
@@ -29,10 +29,10 @@ services:
       context: .
       dockerfile: docker/worker.Dockerfile
     environment:
-      VIDEO2TIMELINE_RUNTIME_DEFAULTS: /app/config/runtime.defaults.json
-      VIDEO2TIMELINE_APPDATA_ROOT: /shared/app-data
-      VIDEO2TIMELINE_UPLOADS_ROOT: /shared/uploads
-      VIDEO2TIMELINE_OUTPUTS_ROOT: /shared/outputs
+      TIMELINEFORVIDEO_RUNTIME_DEFAULTS: /app/config/runtime.defaults.json
+      TIMELINEFORVIDEO_APPDATA_ROOT: /shared/app-data
+      TIMELINEFORVIDEO_UPLOADS_ROOT: /shared/uploads
+      TIMELINEFORVIDEO_OUTPUTS_ROOT: /shared/outputs
       HF_HOME: /cache/huggingface
       TRANSFORMERS_CACHE: /cache/huggingface
       TORCH_HOME: /cache/torch

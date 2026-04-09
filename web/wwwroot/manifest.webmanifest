@@ -1,7 +1,7 @@
 {
-  "name": "VIDEO2TIMELINE",
-  "short_name": "VIDEO2TIMELINE",
-  "description": "VIDEO2TIMELINE web application",
+  "name": "TimelineForVideo",
+  "short_name": "TimelineForVideo",
+  "description": "TimelineForVideo web application",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
