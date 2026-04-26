@@ -17,19 +17,37 @@ def _read_env(primary_key: str, legacy_key: str, default: str) -> str:
 
 
 def appdata_root() -> Path:
-    return Path(_read_env("TIMELINEFORVIDEO_APPDATA_ROOT", "VIDEO2TIMELINE_APPDATA_ROOT", "/shared/app-data"))
+    return Path(
+        _read_env(
+            "TIMELINEFORVIDEO_APPDATA_ROOT", "VIDEO2TIMELINE_APPDATA_ROOT", "/shared/app-data"
+        )
+    )
 
 
 def uploads_root() -> Path:
-    return Path(_read_env("TIMELINEFORVIDEO_UPLOADS_ROOT", "VIDEO2TIMELINE_UPLOADS_ROOT", "/shared/uploads"))
+    return Path(
+        _read_env("TIMELINEFORVIDEO_UPLOADS_ROOT", "VIDEO2TIMELINE_UPLOADS_ROOT", "/shared/uploads")
+    )
 
 
 def outputs_root() -> Path:
-    return Path(_read_env("TIMELINEFORVIDEO_OUTPUTS_ROOT", "VIDEO2TIMELINE_OUTPUTS_ROOT", str(appdata_root() / "outputs")))
+    return Path(
+        _read_env(
+            "TIMELINEFORVIDEO_OUTPUTS_ROOT",
+            "VIDEO2TIMELINE_OUTPUTS_ROOT",
+            str(appdata_root() / "outputs"),
+        )
+    )
 
 
 def runtime_defaults_path() -> Path:
-    return Path(_read_env("TIMELINEFORVIDEO_RUNTIME_DEFAULTS", "VIDEO2TIMELINE_RUNTIME_DEFAULTS", "/app/config/runtime.defaults.json"))
+    return Path(
+        _read_env(
+            "TIMELINEFORVIDEO_RUNTIME_DEFAULTS",
+            "VIDEO2TIMELINE_RUNTIME_DEFAULTS",
+            "/app/config/runtime.defaults.json",
+        )
+    )
 
 
 def load_runtime_defaults() -> dict[str, Any]:

@@ -236,7 +236,9 @@ def _extract_frame_best_effort(
         return None, None
 
     stderr_text = " ".join((last_error.stderr or "").split())
-    detail = stderr_text[:240] if stderr_text else f"ffmpeg exited with status {last_error.returncode}"
+    detail = (
+        stderr_text[:240] if stderr_text else f"ffmpeg exited with status {last_error.returncode}"
+    )
     return (
         None,
         f"Skipped screenshot at {timestamp:.3f}s after {len(attempts)} ffmpeg attempt(s): {detail}",
@@ -251,7 +253,7 @@ def extract_screens(
     thresholds: ChangeDetectionConfig,
     compute_mode: str | None,
     processing_quality: str | None,
- ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str]]:
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str]]:
     from .change_detection import compare_images
 
     ensure_dir(screen_dir)

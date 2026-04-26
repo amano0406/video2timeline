@@ -57,12 +57,44 @@ open_app_window() {
 }
 
 WEB_PORT="$(read_env_value TIMELINEFORVIDEO_WEB_PORT)"
+LEGACY_WEB_PORT=""
 if [ -z "${WEB_PORT}" ]; then
-  WEB_PORT="$(read_env_value VIDEO2TIMELINE_WEB_PORT)"
+  LEGACY_WEB_PORT="$(read_env_value VIDEO2TIMELINE_WEB_PORT)"
+fi
+if [ -n "${LEGACY_WEB_PORT}" ]; then
+  if [[ "${LEGACY_WEB_PORT}" =~ ^[0-9]+$ ]]; then
+    WEB_PORT="$((LEGACY_WEB_PORT + 1000))"
+    echo "Using port ${WEB_PORT} based on legacy VIDEO2TIMELINE_WEB_PORT=${LEGACY_WEB_PORT}."
+  else
+    WEB_PORT="${LEGACY_WEB_PORT}"
+  fi
 fi
 if [ -z "${WEB_PORT}" ]; then
-  WEB_PORT="38090"
+  WEB_PORT="19200"
 fi
+
+is_port_listening() {
+  local port="$1"
+  lsof -nP -iTCP:"${port}" -sTCP:LISTEN >/dev/null 2>&1
+}
+
+resolve_available_port() {
+  local port="$1"
+  while is_port_listening "${port}"; do
+    port=$((port + 1))
+  done
+  printf '%s' "${port}"
+}
+
+running_services="$(docker compose ps --services --status running || true)"
+if ! echo "${running_services}" | grep -qx "web" || ! echo "${running_services}" | grep -qx "worker"; then
+  RESOLVED_WEB_PORT="$(resolve_available_port "${WEB_PORT}")"
+  if [ "${RESOLVED_WEB_PORT}" != "${WEB_PORT}" ]; then
+    echo "Port ${WEB_PORT} is already in use. TimelineForVideo will use port ${RESOLVED_WEB_PORT} instead."
+    WEB_PORT="${RESOLVED_WEB_PORT}"
+  fi
+fi
+
 export TIMELINEFORVIDEO_WEB_PORT="${WEB_PORT}"
 
 APP_URL="http://localhost:${WEB_PORT}"

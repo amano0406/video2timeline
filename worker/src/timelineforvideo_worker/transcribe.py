@@ -322,9 +322,7 @@ def transcribe_audio(
                 )
                 continue
             if _is_cuda_runtime_failure(exc):
-                cpu_fallback_warning = (
-                    "GPU transcription failed with a CUDA runtime error; transcription fell back to CPU."
-                )
+                cpu_fallback_warning = "GPU transcription failed with a CUDA runtime error; transcription fell back to CPU."
                 break
             raise
 

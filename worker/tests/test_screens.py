@@ -7,13 +7,13 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from timelineforvideo_worker.config import ChangeDetectionConfig
 from timelineforvideo_worker.screens import (
     candidate_timestamps,
     extract_screens,
     normalize_processing_quality,
     resolve_caption_model_id_for_quality,
 )
-from timelineforvideo_worker.config import ChangeDetectionConfig
 
 
 class CandidateTimestampsTests(unittest.TestCase):
@@ -68,10 +68,20 @@ class ExtractScreensTests(unittest.TestCase):
                 )
             )
             with (
-                patch("timelineforvideo_worker.screens.candidate_timestamps", return_value=[596.473]),
-                patch("timelineforvideo_worker.screens.extract_frame", side_effect=fake_extract_frame),
-                patch("timelineforvideo_worker.screens._load_ocr_components", return_value=(None, None)),
-                patch.dict("sys.modules", {"timelineforvideo_worker.change_detection": fake_change_detection}),
+                patch(
+                    "timelineforvideo_worker.screens.candidate_timestamps", return_value=[596.473]
+                ),
+                patch(
+                    "timelineforvideo_worker.screens.extract_frame", side_effect=fake_extract_frame
+                ),
+                patch(
+                    "timelineforvideo_worker.screens._load_ocr_components",
+                    return_value=(None, None),
+                ),
+                patch.dict(
+                    "sys.modules",
+                    {"timelineforvideo_worker.change_detection": fake_change_detection},
+                ),
             ):
                 notes, diffs, warnings = extract_screens(
                     video_path=Path("/tmp/video.mp4"),
@@ -105,10 +115,21 @@ class ExtractScreensTests(unittest.TestCase):
                 )
             )
             with (
-                patch("timelineforvideo_worker.screens.candidate_timestamps", return_value=[10.0, 20.0]),
-                patch("timelineforvideo_worker.screens.extract_frame", side_effect=fake_extract_frame),
-                patch("timelineforvideo_worker.screens._load_ocr_components", return_value=(None, None)),
-                patch.dict("sys.modules", {"timelineforvideo_worker.change_detection": fake_change_detection}),
+                patch(
+                    "timelineforvideo_worker.screens.candidate_timestamps",
+                    return_value=[10.0, 20.0],
+                ),
+                patch(
+                    "timelineforvideo_worker.screens.extract_frame", side_effect=fake_extract_frame
+                ),
+                patch(
+                    "timelineforvideo_worker.screens._load_ocr_components",
+                    return_value=(None, None),
+                ),
+                patch.dict(
+                    "sys.modules",
+                    {"timelineforvideo_worker.change_detection": fake_change_detection},
+                ),
             ):
                 notes, diffs, warnings = extract_screens(
                     video_path=Path("/tmp/video.mp4"),

@@ -44,12 +44,39 @@ if not exist ".env" (
   echo Created .env from .env.example.
 )
 
-set "WEB_PORT=38090"
+set "WEB_PORT=19200"
+set "HAS_WEB_PORT="
+set "LEGACY_WEB_PORT="
 
 for /f "usebackq tokens=1,* delims==" %%A in (".env") do (
-  if /I "%%A"=="TIMELINEFORVIDEO_WEB_PORT" set "WEB_PORT=%%B"
-  if /I "%%A"=="VIDEO2TIMELINE_WEB_PORT" if not defined WEB_PORT set "WEB_PORT=%%B"
+  if /I "%%A"=="TIMELINEFORVIDEO_WEB_PORT" (
+    set "WEB_PORT=%%B"
+    set "HAS_WEB_PORT=1"
+  )
+  if /I "%%A"=="VIDEO2TIMELINE_WEB_PORT" set "LEGACY_WEB_PORT=%%B"
 )
+
+if not defined HAS_WEB_PORT if defined LEGACY_WEB_PORT (
+  set /a SHIFTED_LEGACY_PORT=%LEGACY_WEB_PORT%+1000 >nul 2>&1
+  if not errorlevel 1 (
+    set "WEB_PORT=!SHIFTED_LEGACY_PORT!"
+    echo Using port !WEB_PORT! based on legacy VIDEO2TIMELINE_WEB_PORT=%LEGACY_WEB_PORT%.
+  ) else (
+    set "WEB_PORT=%LEGACY_WEB_PORT%"
+  )
+)
+
+set "WEB_RUNNING="
+set "WORKER_RUNNING="
+for /f %%S in ('docker compose ps --services --status running 2^>nul') do (
+  if /I "%%S"=="web" set "WEB_RUNNING=1"
+  if /I "%%S"=="worker" set "WORKER_RUNNING=1"
+)
+
+if not defined WEB_RUNNING if not defined WORKER_RUNNING (
+  call :ResolveAvailablePort "%WEB_PORT%"
+)
+
 set "TIMELINEFORVIDEO_WEB_PORT=%WEB_PORT%"
 
 echo Starting web and worker containers...
@@ -103,3 +130,13 @@ echo.
 echo Last container logs:
 docker compose logs --tail 40 web worker
 exit /b 1
+
+:ResolveAvailablePort
+setlocal
+set "REQUESTED_PORT=%~1"
+for /f %%P in ('powershell -NoLogo -NoProfile -Command "$port=[int]('%~1'); while (Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue) { $port++ }; Write-Output $port"') do set "RESOLVED_PORT=%%P"
+if not "%REQUESTED_PORT%"=="%RESOLVED_PORT%" (
+  echo Port %REQUESTED_PORT% is already in use. TimelineForVideo will use port %RESOLVED_PORT% instead.
+)
+endlocal & set "WEB_PORT=%RESOLVED_PORT%"
+exit /b 0

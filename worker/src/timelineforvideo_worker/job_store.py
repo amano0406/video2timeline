@@ -427,7 +427,9 @@ def create_job(
 def _iter_job_dirs(output_path: Path) -> list[Path]:
     rows = list(output_path.glob("job-*"))
     rows.extend(output_path.glob("run-*"))
-    return sorted({item.resolve(): item for item in rows}.values(), key=lambda item: item.name, reverse=True)
+    return sorted(
+        {item.resolve(): item for item in rows}.values(), key=lambda item: item.name, reverse=True
+    )
 
 
 def settings_snapshot(settings: dict[str, Any] | None = None) -> dict[str, Any]:

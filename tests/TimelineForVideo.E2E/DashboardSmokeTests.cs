@@ -1,6 +1,6 @@
+using System.IO.Compression;
 using System.Net;
 using System.Text.RegularExpressions;
-using System.IO.Compression;
 using Microsoft.Playwright;
 
 namespace TimelineForVideo.E2E;
@@ -53,9 +53,23 @@ public sealed class DashboardSmokeTests : PageTest
     {
         await Page.GotoAsync($"{_fixture.BaseUrl}/settings");
 
-        await Expect(Page.GetByLabel("Hugging Face Token")).ToHaveValueAsync(string.Empty);
+        await Expect(Page.GetByText("Saved", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByLabel("Hugging Face Token")).ToHaveValueAsync("************");
+        await Expect(Page.GetByLabel("Hugging Face Token")).ToHaveAttributeAsync("placeholder", "************");
         var html = await Page.ContentAsync();
         Assert.IsFalse(html.Contains("hf_test_token_value", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public async Task Settings_Save_Keeps_SavedToken_When_Mask_Is_Unchanged()
+    {
+        await Page.GotoAsync($"{_fixture.BaseUrl}/settings");
+
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Save And Continue" }).ClickAsync();
+        await Expect(Page).ToHaveURLAsync(new Regex(".*/jobs/new$"));
+
+        var token = await _fixture.ReadTokenAsync();
+        Assert.AreEqual("hf_test_token_value", token);
     }
 
     [TestMethod]

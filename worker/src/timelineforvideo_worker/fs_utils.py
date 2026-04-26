@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-
 _PATH_LOCKS: dict[str, threading.Lock] = {}
 _PATH_LOCKS_GUARD = threading.Lock()
 

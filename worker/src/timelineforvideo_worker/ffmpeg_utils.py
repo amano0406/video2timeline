@@ -95,8 +95,12 @@ def summarize_probe_payload(payload: dict[str, Any], path: Path) -> dict[str, An
         "frame_rate": _parse_optional_ratio(
             (video_stream or {}).get("avg_frame_rate") or (video_stream or {}).get("r_frame_rate")
         ),
-        "audio_channels": _parse_optional_int(audio_stream.get("channels")) if audio_stream else None,
-        "audio_sample_rate": _parse_optional_int(audio_stream.get("sample_rate")) if audio_stream else None,
+        "audio_channels": _parse_optional_int(audio_stream.get("channels"))
+        if audio_stream
+        else None,
+        "audio_sample_rate": _parse_optional_int(audio_stream.get("sample_rate"))
+        if audio_stream
+        else None,
         "has_video": video_stream is not None,
         "has_audio": audio_stream is not None,
     }

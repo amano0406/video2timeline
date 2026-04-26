@@ -182,6 +182,18 @@ internal sealed class TestAppFixture : IAsyncDisposable
         await File.WriteAllTextAsync(tokenPath, token);
     }
 
+    public async Task<string?> ReadTokenAsync()
+    {
+        var tokenPath = Path.Combine(TempRoot, "app-data", "secrets", "huggingface.token");
+        if (!File.Exists(tokenPath))
+        {
+            return null;
+        }
+
+        var token = await File.ReadAllTextAsync(tokenPath);
+        return string.IsNullOrWhiteSpace(token) ? null : token.Trim();
+    }
+
     private async Task WaitUntilReadyAsync()
     {
         using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };

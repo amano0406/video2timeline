@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import unittest
-from tempfile import TemporaryDirectory
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from timelineforvideo_worker import processor
@@ -20,7 +20,9 @@ class ProcessorQueueTests(unittest.TestCase):
 
             self.assertIsNone(processor._resolve_duplicate_timeline_path(duplicate))
 
-    def test_resolve_duplicate_timeline_path_uses_run_dir_when_timeline_path_is_missing(self) -> None:
+    def test_resolve_duplicate_timeline_path_uses_run_dir_when_timeline_path_is_missing(
+        self,
+    ) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             timeline_path = root / "job-1" / "media" / "sample-media" / "timeline" / "timeline.md"

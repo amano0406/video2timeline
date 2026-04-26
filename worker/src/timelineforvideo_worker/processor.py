@@ -673,7 +673,9 @@ def process_job(job_dir: Path | None = None) -> bool:
             heartbeat_stop = threading.Event()
             heartbeat_lock = threading.Lock()
 
-            def snapshot_stage_state(now_value: float | None = None) -> tuple[str, float, dict[str, float]]:
+            def snapshot_stage_state(
+                now_value: float | None = None,
+            ) -> tuple[str, float, dict[str, float]]:
                 reference = now_value if now_value is not None else monotonic()
                 with heartbeat_lock:
                     stage_name = str(heartbeat_state["stage_name"])

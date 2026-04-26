@@ -55,7 +55,9 @@ def _frame_rate_bucket(frame_rate: float | None) -> str:
     return "ultra"
 
 
-def _scale_sample_total(sample_duration_sec: float, sample_total_sec: float, target_duration_sec: float) -> float:
+def _scale_sample_total(
+    sample_duration_sec: float, sample_total_sec: float, target_duration_sec: float
+) -> float:
     safe_sample_duration = max(1.0, sample_duration_sec)
     safe_target_duration = max(1.0, target_duration_sec)
     duration_ratio = max(0.25, min(4.0, safe_target_duration / safe_sample_duration))
@@ -89,7 +91,9 @@ class HistoricalSample:
 
 
 class EtaPredictor:
-    def __init__(self, samples: Iterable[HistoricalSample], compute_mode: str, processing_quality: str) -> None:
+    def __init__(
+        self, samples: Iterable[HistoricalSample], compute_mode: str, processing_quality: str
+    ) -> None:
         self._samples = list(samples)
         self._compute_mode = _normalize_text(compute_mode) or "cpu"
         self._processing_quality = _normalize_text(processing_quality) or "standard"
@@ -198,7 +202,9 @@ def build_eta_predictor(
 
         if (_normalize_text(request.get("compute_mode")) or "cpu") != normalized_compute_mode:
             continue
-        if (_normalize_text(request.get("processing_quality")) or "standard") != normalized_processing_quality:
+        if (
+            _normalize_text(request.get("processing_quality")) or "standard"
+        ) != normalized_processing_quality:
             continue
 
         for item in manifest.get("items", []):
@@ -220,12 +226,16 @@ def build_eta_predictor(
                         _to_optional_int(item.get("width")),
                         _to_optional_int(item.get("height")),
                     ),
-                    frame_rate_bucket=_frame_rate_bucket(_to_optional_float(item.get("frame_rate"))),
+                    frame_rate_bucket=_frame_rate_bucket(
+                        _to_optional_float(item.get("frame_rate"))
+                    ),
                     has_video=_to_optional_bool(item.get("has_video")),
                     has_audio=_to_optional_bool(item.get("has_audio")),
                     duration_seconds=duration_seconds,
                     processing_wall_seconds=processing_wall_seconds,
-                    stage_elapsed_seconds=_normalize_stage_elapsed(item.get("stage_elapsed_seconds")),
+                    stage_elapsed_seconds=_normalize_stage_elapsed(
+                        item.get("stage_elapsed_seconds")
+                    ),
                 )
             )
 
@@ -249,7 +259,10 @@ def estimate_remaining_seconds(
 
     if current_item_index is not None and 0 <= current_item_index < len(manifest_items):
         current_item = manifest_items[current_item_index]
-        if str(current_item.status).lower() not in _TERMINAL_ITEM_STATES and current_item.duplicate_status != "duplicate_skip":
+        if (
+            str(current_item.status).lower() not in _TERMINAL_ITEM_STATES
+            and current_item.duplicate_status != "duplicate_skip"
+        ):
             prediction = predictor.predict_item(current_item)
             if prediction is not None:
                 if current_stage_name:
@@ -269,7 +282,10 @@ def estimate_remaining_seconds(
     for index, item in enumerate(manifest_items):
         if current_item_index is not None and index <= current_item_index:
             continue
-        if item.duplicate_status == "duplicate_skip" or str(item.status).lower() in _TERMINAL_ITEM_STATES:
+        if (
+            item.duplicate_status == "duplicate_skip"
+            or str(item.status).lower() in _TERMINAL_ITEM_STATES
+        ):
             continue
         prediction = predictor.predict_item(item)
         if prediction is None:
@@ -290,7 +306,9 @@ def estimate_remaining_seconds(
     if legacy_remaining_sec is None:
         return history_remaining
 
-    blended = (history_remaining * history_confidence) + (legacy_remaining_sec * (1.0 - history_confidence))
+    blended = (history_remaining * history_confidence) + (
+        legacy_remaining_sec * (1.0 - history_confidence)
+    )
     return round(max(0.0, blended), 3)
 
 
