@@ -137,7 +137,7 @@ Windows:
 .\start.bat
 ```
 
-This is the primary supported path for the `v0.3.3` public release line.
+This is the primary supported path for the `v0.4.0` public release line.
 
 macOS:
 
@@ -145,7 +145,7 @@ macOS:
 ./start.command
 ```
 
-This path is available as an experimental source-based setup in `v0.3.3`. It is not the baseline support contract for the current public release line.
+This path is available as an experimental source-based setup in `v0.4.0`. It is not the baseline support contract for the current public release line.
 
 Then:
 
@@ -182,7 +182,7 @@ The public release baseline is CPU mode.
 - `GPU`
   - requires NVIDIA GPU support inside Docker
   - faster for the main ML workloads
-  - best-effort in the `v0.3.3` public release line
+  - best-effort in the `v0.4.0` public release line
 
 Processing quality:
 

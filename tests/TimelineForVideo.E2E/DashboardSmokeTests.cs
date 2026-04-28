@@ -6,6 +6,7 @@ using Microsoft.Playwright;
 namespace TimelineForVideo.E2E;
 
 [TestClass]
+[DoNotParallelize]
 public sealed class DashboardSmokeTests : PageTest
 {
     private static TestAppFixture _fixture = null!;

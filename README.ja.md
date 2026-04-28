@@ -138,7 +138,7 @@ Windows:
 .\start.bat
 ```
 
-`v0.3.3` の public release では、これが primary supported path です。
+`v0.4.0` の public release では、これが primary supported path です。
 
 macOS:
 
@@ -146,7 +146,7 @@ macOS:
 ./start.command
 ```
 
-こちらは `v0.3.3` では experimental な source-based path です。現在の public release line の baseline support には含めません。
+こちらは `v0.4.0` では experimental な source-based path です。現在の public release line の baseline support には含めません。
 
 起動後の流れ:
 
@@ -183,7 +183,7 @@ public release の baseline は CPU mode です。
 - `GPU`
   - Docker から使える NVIDIA GPU が必要
   - 主な AI 処理が高速になる
-  - `v0.3.3` では best-effort 扱い
+  - `v0.4.0` では best-effort 扱い
 
 処理精度:
 

@@ -35,6 +35,22 @@ v1 supports:
 
 The web app expands selected roots into concrete file items before writing `request.json`.
 
+## Current Docker Storage Contract
+
+The current Docker contract uses named volumes mounted inside the containers:
+
+- uploads input root: `/shared/uploads`
+- run output root: `/shared/outputs`
+- app state and secrets root: `/shared/app-data`
+- model caches: `/cache/huggingface` and `/cache/torch`
+
+This differs from the shared Timeline baseline that uses a repo-local `data/` workspace such as
+`data/input/video` and `data/output/runs/timeline-for-video`.
+
+For the current v1 release line, `/shared/uploads` and `/shared/outputs` are the active Docker
+runtime contract. Moving Docker runs to the shared `data/` baseline would be an output/storage
+contract migration and should not be done without explicit approval.
+
 ## Output Model
 
 Every run writes:

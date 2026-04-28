@@ -69,7 +69,7 @@ internal sealed class TestAppFixture : IAsyncDisposable
 
     public static async Task<TestAppFixture> StartAsync()
     {
-        var repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var repoRoot = ResolveRepoRoot();
         var tempRoot = Path.Combine(Path.GetTempPath(), $"timelineforvideo-e2e-{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempRoot);
 
@@ -78,6 +78,32 @@ internal sealed class TestAppFixture : IAsyncDisposable
         await fixture.WaitUntilReadyAsync();
         return fixture;
     }
+
+    private static string ResolveRepoRoot()
+    {
+        var configured = Environment.GetEnvironmentVariable("TIMELINEFORVIDEO_E2E_REPO_ROOT");
+        if (!string.IsNullOrWhiteSpace(configured) && IsRepoRoot(configured))
+        {
+            return Path.GetFullPath(configured);
+        }
+
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            if (IsRepoRoot(current.FullName))
+            {
+                return current.FullName;
+            }
+
+            current = current.Parent;
+        }
+
+        return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+    }
+
+    private static bool IsRepoRoot(string path) =>
+        File.Exists(Path.Combine(path, "web", "TimelineForVideo.Web.csproj")) &&
+        File.Exists(Path.Combine(path, "tests", "TimelineForVideo.E2E", "TimelineForVideo.E2E.csproj"));
 
     private static async Task<TestAppFixture> CreateAndStartAsync(string repoRoot, string tempRoot, int port)
     {
@@ -271,6 +297,22 @@ internal sealed class TestAppFixture : IAsyncDisposable
         await File.WriteAllTextAsync(
             Path.Combine(appDataRoot, "secrets", "huggingface.token"),
             "hf_test_token_value");
+        await File.WriteAllTextAsync(
+            Path.Combine(appDataRoot, "worker-capabilities.json"),
+            JsonSerializer.Serialize(
+                new
+                {
+                    generatedAt = "2026-03-24T09:00:00+09:00",
+                    torchInstalled = true,
+                    torchCudaBuilt = true,
+                    gpuAvailable = true,
+                    deviceCount = 1,
+                    deviceNames = new[] { "E2E Test GPU" },
+                    deviceMemoryGiB = new[] { 12.0 },
+                    maxGpuMemoryGiB = 12.0,
+                    message = "E2E fixture GPU capability.",
+                },
+                new JsonSerializerOptions { WriteIndented = true }));
     }
 
     private static async Task SeedCompletedRunAsync(string outputRoot, string tempRoot)

@@ -14,7 +14,7 @@ services:
       TIMELINEFORVIDEO_HF_CACHE_ROOT: /cache/huggingface
       TIMELINEFORVIDEO_TORCH_CACHE_ROOT: /cache/torch
     ports:
-      - "${TIMELINEFORVIDEO_WEB_PORT:-19200}:8080"
+      - "127.0.0.1:${TIMELINEFORVIDEO_WEB_PORT:-19200}:8080"
     volumes:
       - app-data:/shared/app-data
       - outputs:/shared/outputs

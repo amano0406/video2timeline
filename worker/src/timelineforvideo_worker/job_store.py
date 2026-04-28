@@ -263,6 +263,8 @@ def _build_export_package(run_dir: Path, job_id: str, export_root: Path) -> None
     if transcription_info_path.exists():
         shutil.copy2(transcription_info_path, export_root / "TRANSCRIPTION_INFO.md")
 
+    has_failure_artifacts = _write_failure_artifacts(run_dir, job_id, export_root, len(timelines))
+
     package_note = "\n".join(
         [
             "# README",
@@ -273,6 +275,16 @@ def _build_export_package(run_dir: Path, job_id: str, export_root: Path) -> None
             "- Main folder: `timelines/`",
             "- Each markdown file is one video timeline.",
             "- `TRANSCRIPTION_INFO.md` explains which processing and models were used.",
+            (
+                "- `FAILURE_REPORT.md` summarizes any failed items or warnings from the job."
+                if has_failure_artifacts
+                else ""
+            ),
+            (
+                "- `logs/worker.log` is included for troubleshooting."
+                if has_failure_artifacts and (run_dir / "logs" / "worker.log").exists()
+                else ""
+            ),
             "",
         ]
     )
@@ -286,6 +298,102 @@ def _build_export_package(run_dir: Path, job_id: str, export_root: Path) -> None
             Path(row["timeline_path"]).read_text(encoding="utf-8", errors="replace"),
             encoding="utf-8",
         )
+
+
+def _write_failure_artifacts(
+    run_dir: Path, job_id: str, export_root: Path, exported_timeline_count: int
+) -> bool:
+    status = _read_optional_json(run_dir / "status.json")
+    result = _read_optional_json(run_dir / "result.json")
+    manifest = _read_optional_json(run_dir / "manifest.json")
+    manifest_items = manifest.get("items", []) if isinstance(manifest.get("items"), list) else []
+    failed_items = [
+        item for item in manifest_items if str(item.get("status") or "").strip().lower() == "failed"
+    ]
+
+    warnings = _collect_warnings(status, result)
+    status_state = str(status.get("state") or result.get("state") or "unknown")
+    has_failures = (
+        bool(failed_items)
+        or int(status.get("videos_failed") or 0) > 0
+        or int(result.get("error_count") or 0) > 0
+        or status_state.lower() == "failed"
+    )
+    if not has_failures and not warnings:
+        return False
+
+    lines = [
+        "# Failure Report",
+        "",
+        "This job produced downloadable timelines, but some items did not complete successfully.",
+        "",
+        f"- Job ID: `{job_id}`",
+        f"- Final state: `{status_state}`",
+        f"- Exported timelines: `{exported_timeline_count}`",
+        f"- Completed items: `{status.get('videos_done') or result.get('processed_count') or 0}`",
+        (
+            "- Failed items: "
+            f"`{status.get('videos_failed') or result.get('error_count') or len(failed_items)}`"
+        ),
+        f"- Skipped items: `{status.get('videos_skipped') or result.get('skipped_count') or 0}`",
+    ]
+
+    message = str(status.get("message") or "").strip()
+    if message:
+        lines.append(f"- Final message: {message}")
+
+    if failed_items:
+        lines.extend(["", "## Failed Items", ""])
+        for item in sorted(failed_items, key=lambda row: str(row.get("original_path") or "")):
+            label = str(item.get("original_path") or item.get("file_name") or "").strip()
+            media_id = str(item.get("media_id") or "").strip()
+            if media_id:
+                lines.append(f"- `{label}` (`{media_id}`)")
+            else:
+                lines.append(f"- `{label}`")
+
+    if warnings:
+        lines.extend(["", "## Warnings", ""])
+        lines.extend(f"- {warning}" for warning in warnings)
+
+    worker_log_path = run_dir / "logs" / "worker.log"
+    if worker_log_path.exists():
+        logs_root = export_root / "logs"
+        logs_root.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(worker_log_path, logs_root / "worker.log")
+        lines.extend(
+            [
+                "",
+                "## Worker Log",
+                "",
+                "- See `logs/worker.log` for the full worker log captured for this job.",
+            ]
+        )
+
+    (export_root / "FAILURE_REPORT.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return True
+
+
+def _read_optional_json(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8-sig", errors="replace"))
+    except json.JSONDecodeError:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _collect_warnings(*payloads: dict[str, Any]) -> list[str]:
+    rows: list[str] = []
+    seen: set[str] = set()
+    for payload in payloads:
+        for warning in payload.get("warnings") or []:
+            normalized = str(warning).strip()
+            if normalized and normalized not in seen:
+                rows.append(normalized)
+                seen.add(normalized)
+    return rows
 
 
 def _best_export_label(media_id: str, source_info: dict[str, Any]) -> str:

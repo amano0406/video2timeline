@@ -208,6 +208,102 @@ class JobStoreTests(unittest.TestCase):
                 self.assertIn("TRANSCRIPTION_INFO.md", names)
                 self.assertIn("timelines/2026-03-24 12-58-32.md", names)
 
+    def test_build_run_archive_preserves_failure_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            runs_root = root / "runs"
+            settings = {
+                "videoExtensions": [".mp4"],
+                "inputRoots": [],
+                "outputRoots": [{"id": "runs", "path": str(runs_root), "enabled": True}],
+                "huggingfaceTermsConfirmed": False,
+            }
+
+            source_file = root / "sample.mp4"
+            source_file.write_bytes(b"sample")
+            items = collect_input_items(settings=settings, files=[source_file])
+            job_id, run_dir = create_job(settings=settings, input_items=items)
+            (run_dir / "status.json").write_text(
+                json.dumps(
+                    {
+                        "job_id": job_id,
+                        "state": "completed",
+                        "videos_done": 1,
+                        "videos_failed": 1,
+                        "warnings": ["OCR unavailable for one item."],
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            (run_dir / "result.json").write_text(
+                json.dumps(
+                    {
+                        "job_id": job_id,
+                        "state": "completed",
+                        "processed_count": 1,
+                        "error_count": 1,
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            (run_dir / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "job_id": job_id,
+                        "items": [
+                            {
+                                "input_id": "loca-0001",
+                                "source_kind": "local_file",
+                                "original_path": str(source_file),
+                                "file_name": "sample.mp4",
+                                "size_bytes": 6,
+                                "duration_seconds": 1.0,
+                                "sha256": "abc",
+                                "duplicate_status": "new",
+                                "media_id": "sample-12345678",
+                                "status": "completed",
+                            },
+                            {
+                                "input_id": "loca-0002",
+                                "source_kind": "local_file",
+                                "original_path": str(root / "failed.mp4"),
+                                "file_name": "failed.mp4",
+                                "size_bytes": 0,
+                                "duration_seconds": 0.0,
+                                "sha256": "def",
+                                "duplicate_status": "new",
+                                "media_id": "failed-12345678",
+                                "status": "failed",
+                            },
+                        ],
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            media_dir = run_dir / "media" / "sample-12345678"
+            (media_dir / "timeline").mkdir(parents=True)
+            (media_dir / "timeline" / "timeline.md").write_text("# Timeline\n", encoding="utf-8")
+            (media_dir / "source.json").write_text(
+                json.dumps({"display_name": "sample.mp4"}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            (run_dir / "logs").mkdir(exist_ok=True)
+            (run_dir / "logs" / "worker.log").write_text("failed item details\n", encoding="utf-8")
+
+            archive_path = build_run_archive(job_id, settings=settings)
+
+            with zipfile.ZipFile(archive_path) as archive:
+                names = set(archive.namelist())
+                self.assertIn("FAILURE_REPORT.md", names)
+                self.assertIn("logs/worker.log", names)
+                failure_report = archive.read("FAILURE_REPORT.md").decode("utf-8")
+                self.assertIn("OCR unavailable for one item.", failure_report)
+                self.assertIn("failed.mp4", failure_report)
+
 
 if __name__ == "__main__":
     unittest.main()
