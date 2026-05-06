@@ -123,3 +123,14 @@ Start from:
 4. `docs/OUTPUT_CONTRACT.md`
 5. `docs/ACCEPTANCE_CRITERIA.md`
 6. `docs/IMPLEMENTATION_MILESTONES.md`
+
+Operational docs:
+
+- `README.ja.md`
+- `docs/CLI.md`
+- `docs/OUTPUTS.md`
+- `docs/PIPELINE.md`
+- `docs/RUNTIME.md`
+- `docs/SAFETY.md`
+- `docs/TESTING.md`
+- `docs/VALIDATION_REPORT.md`
