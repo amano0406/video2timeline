@@ -13,6 +13,7 @@ from .discovery import (
     assess_output_root,
     discover_video_files,
 )
+from .items import list_items, refresh_items
 from .probe import ffprobe_version, probe_video_files
 from .sampling import (
     DEFAULT_MAX_ITEMS,
@@ -94,6 +95,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sample_frames_parser.add_argument("--json", action="store_true", help="Emit JSON output.")
     sample_frames_parser.set_defaults(handler=handle_sample_frames)
+
+    items_parser = subparsers.add_parser("items", help="Refresh and list item records.")
+    items_subparsers = items_parser.add_subparsers(dest="items_command", required=True)
+
+    items_refresh_parser = items_subparsers.add_parser("refresh", help="Refresh item JSON records.")
+    items_refresh_parser.add_argument("--ffprobe-bin", default="ffprobe", help="ffprobe command path.")
+    items_refresh_parser.add_argument("--max-items", type=int, default=None, help="Limit refreshed files.")
+    items_refresh_parser.add_argument("--json", action="store_true", help="Emit JSON output.")
+    items_refresh_parser.set_defaults(handler=handle_items_refresh)
+
+    items_list_parser = items_subparsers.add_parser("list", help="List refreshed item records.")
+    items_list_parser.add_argument("--json", action="store_true", help="Emit JSON output.")
+    items_list_parser.set_defaults(handler=handle_items_list)
 
     serve_parser = subparsers.add_parser("serve", help="Keep the worker container alive.")
     serve_parser.add_argument(
@@ -368,6 +382,82 @@ def handle_sample_frames(args: argparse.Namespace) -> int:
                 print(f"        warning: {warning}")
 
     return 0 if result["ok"] else 1
+
+
+def handle_items_refresh(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    discovery = discover_video_files(settings)
+    try:
+        result = refresh_items(
+            discovery.files,
+            settings["outputRoot"],
+            ffprobe_bin=args.ffprobe_bin,
+            max_items=args.max_items,
+        )
+    except (OSError, ValueError) as exc:
+        payload = {
+            "ok": False,
+            "settingsPath": str(settings_path()),
+            "error": str(exc),
+            "discovery": discovery.to_dict(),
+        }
+        if args.json:
+            emit_json(payload)
+        else:
+            print(f"Item refresh failed: {exc}")
+        return 2
+
+    payload = {
+        "settingsPath": str(settings_path()),
+        "discovery": discovery.to_dict(),
+        **result,
+    }
+
+    if args.json:
+        emit_json(payload)
+    else:
+        print(
+            f"Refreshed {result['counts']['refreshedItems']} of "
+            f"{result['counts']['discoveredFiles']} discovered video item(s)."
+        )
+        if result["counts"]["skippedByMaxItems"]:
+            print(f"Skipped by --max-items: {result['counts']['skippedByMaxItems']}")
+        print("")
+        for record in result["records"]:
+            status = "OK" if record["ok"] else "FAIL"
+            print(f"  [{status}] {record['itemId']} {record['sourcePath']}")
+            print(f"        item_root: {record['itemRoot']}")
+            print(f"        frames: {record['counts']['frames']}")
+            for warning in record["warnings"]:
+                print(f"        warning: {warning}")
+
+    return 0 if result["ok"] else 1
+
+
+def handle_items_list(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    result = list_items(settings["outputRoot"])
+    payload = {
+        "settingsPath": str(settings_path()),
+        **result,
+    }
+
+    if args.json:
+        emit_json(payload)
+    else:
+        print(f"Found {result['counts']['items']} item record(s).")
+        print("")
+        for item in result["items"]:
+            status = "OK" if item["ok"] else "ISSUE"
+            print(f"  [{status}] {item['itemId']} {item['sourcePath'] or ''}".rstrip())
+            print(f"        item_root: {item['itemRoot']}")
+            print(f"        frames: {item['frameCount']}")
+            if item["contactSheet"]:
+                print(f"        contact_sheet: {item['contactSheet']}")
+            for warning in item["warnings"]:
+                print(f"        warning: {warning}")
+
+    return 0
 
 
 def handle_serve(args: argparse.Namespace) -> int:

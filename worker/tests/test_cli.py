@@ -320,6 +320,47 @@ class CliTests(unittest.TestCase):
             self.assertFalse(payload["ok"])
             self.assertIn("samples_per_video", payload["error"])
 
+    def test_items_refresh_and_list_json_use_output_root_records(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "input" / "clip.mp4"
+            source.parent.mkdir()
+            source.write_bytes(b"video")
+            output_root = root / "output"
+            fake_ffprobe = write_fake_ffprobe(root)
+            settings_path, example_path = write_example_settings(
+                root,
+                input_roots=[str(source.parent)],
+                output_root=str(output_root),
+            )
+            env = {
+                "TIMELINE_FOR_VIDEO_SETTINGS_PATH": str(settings_path),
+                "TIMELINE_FOR_VIDEO_SETTINGS_EXAMPLE_PATH": str(example_path),
+            }
+
+            exit_code, _ = run_json(["settings", "init", "--json"], env)
+            self.assertEqual(exit_code, 0)
+
+            exit_code, refresh_payload = run_json(
+                [
+                    "items",
+                    "refresh",
+                    "--json",
+                    "--ffprobe-bin",
+                    fake_ffprobe,
+                    "--max-items",
+                    "1",
+                ],
+                env,
+            )
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(refresh_payload["counts"]["refreshedItems"], 1)
+
+            exit_code, list_payload = run_json(["items", "list", "--json"], env)
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(list_payload["counts"]["items"], 1)
+            self.assertTrue(list_payload["items"][0]["itemId"].startswith("video-"))
+
 
 if __name__ == "__main__":
     unittest.main()

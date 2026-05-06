@@ -22,6 +22,8 @@ cd C:\apps\TimelineForVideo
 .\cli.ps1 files list
 .\cli.ps1 probe list --max-items 1
 .\cli.ps1 sample frames --max-items 1 --samples-per-video 5
+.\cli.ps1 items refresh --max-items 1
+.\cli.ps1 items list
 ```
 
 Stop the worker:
@@ -77,6 +79,27 @@ Milestone 4 sampling writes generated artifacts only under `outputRoot`:
 ```
 
 The default sampling command is bounded to one video and five frames per video.
+
+Milestone 5 item refresh writes item records under `outputRoot`:
+
+```text
+<outputRoot>/
+  items/
+    <item-id>/
+      video_record.json
+      timeline.json
+      convert_info.json
+      raw_outputs/
+        ffprobe.json
+        frame_samples.json
+      artifacts/
+        contact_sheet.jpg
+        frames/
+```
+
+`items refresh` updates the JSON records and the ffprobe raw output. It references
+existing frame samples and contact sheets when present, but does not extract
+frames or copy source videos.
 
 ## Design Docs
 
