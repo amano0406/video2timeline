@@ -15,6 +15,7 @@ git diff --check
 docker compose config
 docker compose build worker
 docker compose run --rm --no-deps worker health --json
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "<parse cli.ps1/start.ps1/stop.ps1>"
 ```
 
 ## Results
@@ -25,6 +26,7 @@ docker compose run --rm --no-deps worker health --json
 - Docker compose config: passed.
 - Docker image build: passed.
 - Docker health: passed.
+- PowerShell launcher parse check: passed.
 - Generated-video smoke test: passed.
 
 ## Smoke Coverage

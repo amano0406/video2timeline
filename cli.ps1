@@ -6,6 +6,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+$global:LASTEXITCODE = $null
 
 $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
 [Console]::OutputEncoding = $utf8NoBom
@@ -30,11 +31,20 @@ function Get-TfvDockerCommand {
     throw "docker.exe was not found. Install or start Docker Desktop."
 }
 
+function Get-TfvLastExitCode {
+    if ($null -eq $global:LASTEXITCODE) {
+        return 1
+    }
+
+    return [int]$global:LASTEXITCODE
+}
+
 function Test-TfvWorkerRunning {
     param([string]$Docker)
 
+    $global:LASTEXITCODE = $null
     $services = @(& $Docker compose --project-directory $repoRoot ps --status running --services 2>$null)
-    if ($LASTEXITCODE -ne 0) {
+    if ((Get-TfvLastExitCode) -ne 0) {
         return $false
     }
 
@@ -44,14 +54,17 @@ function Test-TfvWorkerRunning {
 $docker = Get-TfvDockerCommand
 
 if (Test-TfvWorkerRunning -Docker $docker) {
+    $global:LASTEXITCODE = $null
     & $docker compose --project-directory $repoRoot exec -T worker python -m timeline_for_video_worker @CliArgs
-    exit $LASTEXITCODE
+    exit (Get-TfvLastExitCode)
 }
 
+$global:LASTEXITCODE = $null
 & $docker compose --project-directory $repoRoot build worker
-if ($LASTEXITCODE -ne 0) {
-    exit $LASTEXITCODE
+if ((Get-TfvLastExitCode) -ne 0) {
+    exit (Get-TfvLastExitCode)
 }
 
+$global:LASTEXITCODE = $null
 & $docker compose --project-directory $repoRoot run --rm --no-deps worker @CliArgs
-exit $LASTEXITCODE
+exit (Get-TfvLastExitCode)

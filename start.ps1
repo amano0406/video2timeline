@@ -3,6 +3,7 @@ param()
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+$global:LASTEXITCODE = $null
 
 $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
 [Console]::OutputEncoding = $utf8NoBom
@@ -27,12 +28,21 @@ function Get-TfvDockerCommand {
     throw "docker.exe was not found. Install or start Docker Desktop."
 }
 
+function Get-TfvLastExitCode {
+    if ($null -eq $global:LASTEXITCODE) {
+        return 1
+    }
+
+    return [int]$global:LASTEXITCODE
+}
+
 $docker = Get-TfvDockerCommand
 
 Write-Host "Starting TimelineForVideo worker..."
+$global:LASTEXITCODE = $null
 & $docker compose --project-directory $repoRoot up -d --build
-if ($LASTEXITCODE -ne 0) {
-    exit $LASTEXITCODE
+if ((Get-TfvLastExitCode) -ne 0) {
+    exit (Get-TfvLastExitCode)
 }
 
 Write-Host ""
@@ -45,5 +55,6 @@ Write-Host "  .\cli.ps1 settings status"
 Write-Host "  .\cli.ps1 settings save --input-root C:\TimelineData\input-video --output-root C:\TimelineData\video"
 Write-Host ""
 
+$global:LASTEXITCODE = $null
 & $docker compose --project-directory $repoRoot ps
-exit $LASTEXITCODE
+exit (Get-TfvLastExitCode)

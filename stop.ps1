@@ -3,6 +3,7 @@ param()
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+$global:LASTEXITCODE = $null
 
 $repoRoot = $PSScriptRoot
 
@@ -19,6 +20,15 @@ function Get-TfvDockerCommand {
     throw "docker.exe was not found. Install or start Docker Desktop."
 }
 
+function Get-TfvLastExitCode {
+    if ($null -eq $global:LASTEXITCODE) {
+        return 1
+    }
+
+    return [int]$global:LASTEXITCODE
+}
+
 $docker = Get-TfvDockerCommand
+$global:LASTEXITCODE = $null
 & $docker compose --project-directory $repoRoot down
-exit $LASTEXITCODE
+exit (Get-TfvLastExitCode)
