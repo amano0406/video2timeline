@@ -24,6 +24,8 @@ cd C:\apps\TimelineForVideo
 .\cli.ps1 sample frames --max-items 1 --samples-per-video 5
 .\cli.ps1 items refresh --max-items 1
 .\cli.ps1 items list
+.\cli.ps1 items download
+.\cli.ps1 items remove --dry-run
 ```
 
 Stop the worker:
@@ -100,6 +102,16 @@ Milestone 5 item refresh writes item records under `outputRoot`:
 `items refresh` updates the JSON records and the ffprobe raw output. It references
 existing frame samples and contact sheets when present, but does not extract
 frames or copy source videos.
+
+Milestone 6 export and removal commands are source-safe:
+
+- `items download` writes a ZIP under `<outputRoot>\downloads\` and refreshes
+  `<outputRoot>\latest\items.zip`.
+- ZIP exports include generated item records, raw outputs, and artifacts only.
+  They do not include source videos.
+- `items remove --dry-run` reports generated artifacts that would be removed.
+- `items remove` deletes only known generated files and prunes empty generated
+  directories. It does not delete source videos.
 
 ## Design Docs
 

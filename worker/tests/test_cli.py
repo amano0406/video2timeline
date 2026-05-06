@@ -361,6 +361,42 @@ class CliTests(unittest.TestCase):
             self.assertEqual(list_payload["counts"]["items"], 1)
             self.assertTrue(list_payload["items"][0]["itemId"].startswith("video-"))
 
+    def test_items_download_and_remove_dry_run_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "input" / "clip.mp4"
+            source.parent.mkdir()
+            source.write_bytes(b"video")
+            output_root = root / "output"
+            fake_ffprobe = write_fake_ffprobe(root)
+            settings_path, example_path = write_example_settings(
+                root,
+                input_roots=[str(source.parent)],
+                output_root=str(output_root),
+            )
+            env = {
+                "TIMELINE_FOR_VIDEO_SETTINGS_PATH": str(settings_path),
+                "TIMELINE_FOR_VIDEO_SETTINGS_EXAMPLE_PATH": str(example_path),
+            }
+
+            exit_code, _ = run_json(["settings", "init", "--json"], env)
+            self.assertEqual(exit_code, 0)
+            exit_code, _ = run_json(
+                ["items", "refresh", "--json", "--ffprobe-bin", fake_ffprobe, "--max-items", "1"],
+                env,
+            )
+            self.assertEqual(exit_code, 0)
+
+            exit_code, download_payload = run_json(["items", "download", "--json"], env)
+            self.assertEqual(exit_code, 0)
+            self.assertFalse(download_payload["sourceVideosIncluded"])
+            self.assertTrue(Path(download_payload["archivePath"]).exists())
+
+            exit_code, remove_payload = run_json(["items", "remove", "--dry-run", "--json"], env)
+            self.assertEqual(exit_code, 0)
+            self.assertTrue(remove_payload["dryRun"])
+            self.assertGreater(remove_payload["counts"]["targetFiles"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

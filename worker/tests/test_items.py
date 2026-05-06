@@ -6,9 +6,10 @@ import stat
 import sys
 import tempfile
 import unittest
+import zipfile
 
 from timeline_for_video_worker.discovery import display_path, video_file_from_path
-from timeline_for_video_worker.items import list_items, refresh_items
+from timeline_for_video_worker.items import download_items, list_items, refresh_items, remove_items
 from timeline_for_video_worker.sampling import sample_video_files
 
 
@@ -156,6 +157,87 @@ class ItemsTests(unittest.TestCase):
             self.assertEqual(result["counts"]["items"], 1)
             self.assertTrue(result["items"][0]["itemId"].startswith("video-"))
             self.assertEqual(result["items"][0]["sourcePath"], display_path(source))
+
+    def test_download_items_exports_generated_files_without_source_video(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "input" / "clip.mp4"
+            source.parent.mkdir()
+            source.write_bytes(b"video")
+            output_root = root / "output"
+            fake_ffprobe = write_fake_ffprobe(root)
+            fake_ffmpeg = write_fake_ffmpeg(root)
+            video_file = video_file_from_path(source, str(source.parent))
+
+            sample_video_files(
+                [video_file],
+                str(output_root),
+                ffprobe_bin=fake_ffprobe,
+                ffmpeg_bin=fake_ffmpeg,
+                max_items=1,
+                samples_per_video=2,
+            )
+            refresh_items([video_file], str(output_root), ffprobe_bin=fake_ffprobe, max_items=1)
+
+            result = download_items(str(output_root))
+
+            archive_path = Path(result["archivePath"])
+            latest_path = Path(result["latestArchivePath"])
+            manifest_path = Path(result["latestManifestPath"])
+            self.assertTrue(archive_path.exists())
+            self.assertTrue(latest_path.exists())
+            self.assertTrue(manifest_path.exists())
+            self.assertFalse(result["sourceVideosIncluded"])
+
+            with zipfile.ZipFile(archive_path) as archive:
+                names = archive.namelist()
+
+            self.assertIn("manifest.json", names)
+            self.assertTrue(any(name.endswith("video_record.json") for name in names))
+            self.assertTrue(any(name.endswith("timeline.json") for name in names))
+            self.assertTrue(any(name.endswith("contact_sheet.jpg") for name in names))
+            self.assertFalse(any(name.casefold().endswith(".mp4") for name in names))
+
+    def test_remove_items_deletes_generated_artifacts_only(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "input" / "clip.mp4"
+            source.parent.mkdir()
+            source.write_bytes(b"video")
+            output_root = root / "output"
+            output_root.mkdir()
+            user_video = output_root / "keep-source.mp4"
+            user_video.write_bytes(b"user video")
+            fake_ffprobe = write_fake_ffprobe(root)
+            fake_ffmpeg = write_fake_ffmpeg(root)
+            video_file = video_file_from_path(source, str(source.parent))
+
+            sample_video_files(
+                [video_file],
+                str(output_root),
+                ffprobe_bin=fake_ffprobe,
+                ffmpeg_bin=fake_ffmpeg,
+                max_items=1,
+                samples_per_video=1,
+            )
+            refresh_result = refresh_items([video_file], str(output_root), ffprobe_bin=fake_ffprobe, max_items=1)
+            download_items(str(output_root))
+            item_root = Path(refresh_result["records"][0]["itemRoot"])
+
+            dry_run = remove_items(str(output_root), dry_run=True)
+            self.assertGreater(dry_run["counts"]["targetFiles"], 0)
+            self.assertTrue((item_root / "video_record.json").exists())
+
+            result = remove_items(str(output_root))
+
+            self.assertTrue(result["ok"])
+            self.assertFalse(result["sourceVideosRemoved"])
+            self.assertFalse((item_root / "video_record.json").exists())
+            self.assertFalse((output_root / "latest" / "items.zip").exists())
+            self.assertTrue(source.exists())
+            self.assertEqual(source.read_bytes(), b"video")
+            self.assertTrue(user_video.exists())
+            self.assertEqual(user_video.read_bytes(), b"user video")
 
 
 if __name__ == "__main__":

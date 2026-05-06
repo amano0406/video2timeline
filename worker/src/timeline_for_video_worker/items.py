@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import shutil
 from typing import Any
+import zipfile
 
 from . import __version__
 from .discovery import VideoFile, resolve_configured_path
@@ -15,6 +17,8 @@ TIMELINE_SCHEMA_VERSION = "timeline_for_video.timeline.v1"
 CONVERT_INFO_SCHEMA_VERSION = "timeline_for_video.convert_info.v1"
 ITEM_REFRESH_RESULT_SCHEMA_VERSION = "timeline_for_video.item_refresh_result.v1"
 ITEM_LIST_RESULT_SCHEMA_VERSION = "timeline_for_video.item_list_result.v1"
+ITEM_DOWNLOAD_RESULT_SCHEMA_VERSION = "timeline_for_video.item_download_result.v1"
+ITEM_REMOVE_RESULT_SCHEMA_VERSION = "timeline_for_video.item_remove_result.v1"
 PIPELINE_VERSION = "timeline_for_video.pipeline.m5"
 
 
@@ -324,6 +328,148 @@ def list_items(output_root_text: str) -> dict[str, Any]:
     }
 
 
+def download_items(output_root_text: str) -> dict[str, Any]:
+    generated_at = utc_now_iso()
+    output_root = resolve_configured_path(output_root_text)
+    downloads_dir = output_root / "downloads"
+    latest_dir = output_root / "latest"
+    downloads_dir.mkdir(parents=True, exist_ok=True)
+    latest_dir.mkdir(parents=True, exist_ok=True)
+
+    item_dirs = item_roots(output_root)
+    archive_name = f"timeline-for-video-items-{timestamp_slug(generated_at)}.zip"
+    archive_path = downloads_dir / archive_name
+    latest_archive_path = latest_dir / "items.zip"
+    latest_manifest_path = latest_dir / "download_manifest.json"
+    output_files = [
+        {"kind": "download_zip", "path": str(archive_path), "exists": True},
+        {"kind": "latest_zip", "path": str(latest_archive_path), "exists": True},
+        {"kind": "latest_manifest", "path": str(latest_manifest_path), "exists": True},
+    ]
+    manifest = {
+        "schemaVersion": ITEM_DOWNLOAD_RESULT_SCHEMA_VERSION,
+        "product": PRODUCT_NAME,
+        "version": __version__,
+        "generatedAt": generated_at,
+        "sourceVideosIncluded": False,
+        "outputFiles": output_files,
+        "items": [],
+        "files": [],
+    }
+
+    with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for item_dir in item_dirs:
+            item_files = [path for path in generated_item_files(item_dir) if path.is_file()]
+            manifest["items"].append(
+                {
+                    "itemId": item_dir.name,
+                    "itemRoot": str(item_dir),
+                    "fileCount": len(item_files),
+                }
+            )
+            for path in item_files:
+                archive_path_text = path.relative_to(output_root).as_posix()
+                archive.write(path, archive_path_text)
+                manifest["files"].append(
+                    {
+                        "path": str(path),
+                        "archivePath": archive_path_text,
+                        "sizeBytes": path.stat().st_size,
+                    }
+                )
+        archive.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
+
+    shutil.copy2(archive_path, latest_archive_path)
+    write_json(latest_manifest_path, manifest)
+
+    return {
+        "schemaVersion": ITEM_DOWNLOAD_RESULT_SCHEMA_VERSION,
+        "product": PRODUCT_NAME,
+        "version": __version__,
+        "generatedAt": generated_at,
+        "ok": True,
+        "outputRoot": {
+            "configuredPath": output_root_text,
+            "resolvedPath": str(output_root),
+        },
+        "archivePath": str(archive_path),
+        "latestArchivePath": str(latest_archive_path),
+        "latestManifestPath": str(latest_manifest_path),
+        "sourceVideosIncluded": False,
+        "counts": {
+            "items": len(item_dirs),
+            "files": len(manifest["files"]),
+            "bytes": archive_path.stat().st_size,
+        },
+        "outputFiles": output_files,
+        "items": manifest["items"],
+    }
+
+
+def remove_items(output_root_text: str, dry_run: bool = False) -> dict[str, Any]:
+    output_root = resolve_configured_path(output_root_text)
+    targets = removal_targets(output_root)
+    deleted_files: list[str] = []
+    skipped_files: list[str] = []
+    pruned_dirs: list[str] = []
+    skipped_dirs: list[str] = []
+
+    if not dry_run:
+        for path in targets["files"]:
+            if not safe_generated_path(output_root, path) or path.is_symlink():
+                skipped_files.append(str(path))
+                continue
+            try:
+                path.unlink()
+                deleted_files.append(str(path))
+            except FileNotFoundError:
+                continue
+            except OSError:
+                skipped_files.append(str(path))
+
+        for path in targets["directories"]:
+            if not safe_generated_path(output_root, path) or path.is_symlink():
+                skipped_dirs.append(str(path))
+                continue
+            try:
+                path.rmdir()
+                pruned_dirs.append(str(path))
+            except FileNotFoundError:
+                continue
+            except OSError:
+                skipped_dirs.append(str(path))
+
+    return {
+        "schemaVersion": ITEM_REMOVE_RESULT_SCHEMA_VERSION,
+        "product": PRODUCT_NAME,
+        "version": __version__,
+        "generatedAt": utc_now_iso(),
+        "ok": not skipped_files and not skipped_dirs,
+        "dryRun": dry_run,
+        "outputRoot": {
+            "configuredPath": output_root_text,
+            "resolvedPath": str(output_root),
+        },
+        "sourceVideosRemoved": False,
+        "counts": {
+            "targetFiles": len(targets["files"]),
+            "targetDirectories": len(targets["directories"]),
+            "deletedFiles": len(deleted_files),
+            "prunedDirectories": len(pruned_dirs),
+            "skippedFiles": len(skipped_files),
+            "skippedDirectories": len(skipped_dirs),
+        },
+        "targets": {
+            "files": [str(path) for path in targets["files"]],
+            "directories": [str(path) for path in targets["directories"]],
+        },
+        "deletedFiles": deleted_files,
+        "prunedDirectories": pruned_dirs,
+        "skippedFiles": skipped_files,
+        "skippedDirectories": skipped_dirs,
+    }
+
+
 def item_summary(item_dir: Path, record_path: Path, record: dict[str, Any]) -> dict[str, Any]:
     asset = record.get("asset") if isinstance(record.get("asset"), dict) else {}
     video_format = record.get("video", {}).get("format") if isinstance(record.get("video"), dict) else None
@@ -342,6 +488,99 @@ def item_summary(item_dir: Path, record_path: Path, record: dict[str, Any]) -> d
         "contactSheet": review.get("contact_sheet"),
         "warnings": warnings,
     }
+
+
+def item_roots(output_root: Path) -> list[Path]:
+    items_root = output_root / "items"
+    if not items_root.is_dir():
+        return []
+    return sorted((path for path in items_root.iterdir() if path.is_dir()), key=lambda path: path.name)
+
+
+def generated_item_files(item_dir: Path) -> list[Path]:
+    frames_dir = item_dir / "artifacts" / "frames"
+    files = [
+        item_dir / "video_record.json",
+        item_dir / "timeline.json",
+        item_dir / "convert_info.json",
+        item_dir / "raw_outputs" / "ffprobe.json",
+        item_dir / "raw_outputs" / "frame_samples.json",
+        item_dir / "artifacts" / "contact_sheet.jpg",
+    ]
+    if frames_dir.is_dir():
+        files.extend(sorted(frames_dir.glob("frame-*.jpg")))
+    return files
+
+
+def removal_targets(output_root: Path) -> dict[str, list[Path]]:
+    files: list[Path] = []
+    directories: list[Path] = []
+
+    for item_dir in item_roots(output_root):
+        files.extend(path for path in generated_item_files(item_dir) if path.exists())
+        directories.extend(
+            [
+                item_dir / "artifacts" / "frames",
+                item_dir / "artifacts",
+                item_dir / "raw_outputs",
+                item_dir,
+            ]
+        )
+
+    downloads_dir = output_root / "downloads"
+    if downloads_dir.is_dir():
+        files.extend(sorted(downloads_dir.glob("timeline-for-video-items-*.zip")))
+        directories.append(downloads_dir)
+
+    latest_dir = output_root / "latest"
+    if latest_dir.is_dir():
+        files.extend(
+            path
+            for path in [
+                latest_dir / "items.zip",
+                latest_dir / "download_manifest.json",
+            ]
+            if path.exists()
+        )
+        directories.append(latest_dir)
+
+    items_dir = output_root / "items"
+    if items_dir.is_dir():
+        directories.append(items_dir)
+
+    return {
+        "files": unique_existing_paths(files),
+        "directories": sorted(unique_existing_paths(directories), key=lambda path: len(path.parts), reverse=True),
+    }
+
+
+def unique_existing_paths(paths: list[Path]) -> list[Path]:
+    seen: set[str] = set()
+    unique: list[Path] = []
+    for path in paths:
+        key = str(path)
+        if key in seen or not path.exists():
+            continue
+        seen.add(key)
+        unique.append(path)
+    return unique
+
+
+def safe_generated_path(output_root: Path, path: Path) -> bool:
+    try:
+        path.resolve(strict=False).relative_to(output_root.resolve(strict=False))
+    except ValueError:
+        return False
+    return True
+
+
+def timestamp_slug(value: str) -> str:
+    return (
+        value.replace("+00:00", "Z")
+        .replace("-", "")
+        .replace(":", "")
+        .replace(".", "")
+    )
 
 
 def frame_entries(frame_samples: dict[str, Any] | None) -> list[dict[str, Any]]:

@@ -13,7 +13,7 @@ from .discovery import (
     assess_output_root,
     discover_video_files,
 )
-from .items import list_items, refresh_items
+from .items import download_items, list_items, refresh_items, remove_items
 from .probe import ffprobe_version, probe_video_files
 from .sampling import (
     DEFAULT_MAX_ITEMS,
@@ -108,6 +108,15 @@ def build_parser() -> argparse.ArgumentParser:
     items_list_parser = items_subparsers.add_parser("list", help="List refreshed item records.")
     items_list_parser.add_argument("--json", action="store_true", help="Emit JSON output.")
     items_list_parser.set_defaults(handler=handle_items_list)
+
+    items_download_parser = items_subparsers.add_parser("download", help="Create a source-safe item ZIP.")
+    items_download_parser.add_argument("--json", action="store_true", help="Emit JSON output.")
+    items_download_parser.set_defaults(handler=handle_items_download)
+
+    items_remove_parser = items_subparsers.add_parser("remove", help="Remove generated item artifacts.")
+    items_remove_parser.add_argument("--dry-run", action="store_true", help="Report targets without deleting.")
+    items_remove_parser.add_argument("--json", action="store_true", help="Emit JSON output.")
+    items_remove_parser.set_defaults(handler=handle_items_remove)
 
     serve_parser = subparsers.add_parser("serve", help="Keep the worker container alive.")
     serve_parser.add_argument(
@@ -458,6 +467,49 @@ def handle_items_list(args: argparse.Namespace) -> int:
                 print(f"        warning: {warning}")
 
     return 0
+
+
+def handle_items_download(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    result = download_items(settings["outputRoot"])
+    payload = {
+        "settingsPath": str(settings_path()),
+        **result,
+    }
+
+    if args.json:
+        emit_json(payload)
+    else:
+        print(f"Created item ZIP: {result['archivePath']}")
+        print(f"Latest ZIP: {result['latestArchivePath']}")
+        print(f"Items: {result['counts']['items']}")
+        print(f"Files: {result['counts']['files']}")
+        print("Source videos included: no")
+
+    return 0
+
+
+def handle_items_remove(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    result = remove_items(settings["outputRoot"], dry_run=args.dry_run)
+    payload = {
+        "settingsPath": str(settings_path()),
+        **result,
+    }
+
+    if args.json:
+        emit_json(payload)
+    else:
+        action = "Would remove" if args.dry_run else "Removed"
+        print(f"{action} generated item artifacts.")
+        print(f"Files targeted: {result['counts']['targetFiles']}")
+        print(f"Directories targeted: {result['counts']['targetDirectories']}")
+        if not args.dry_run:
+            print(f"Files deleted: {result['counts']['deletedFiles']}")
+            print(f"Directories pruned: {result['counts']['prunedDirectories']}")
+        print("Source videos removed: no")
+
+    return 0 if result["ok"] else 1
 
 
 def handle_serve(args: argparse.Namespace) -> int:
