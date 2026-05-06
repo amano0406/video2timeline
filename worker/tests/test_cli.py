@@ -41,6 +41,25 @@ def write_fake_ffprobe(directory: Path) -> str:
     return f"{sys.executable} {script}"
 
 
+def write_fake_ffmpeg(directory: Path) -> str:
+    script = directory / "fake_ffmpeg.py"
+    script.write_text(
+        "\n".join(
+            [
+                "from pathlib import Path",
+                "import sys",
+                "if '-version' in sys.argv:",
+                "    print('ffmpeg fake 1.0')",
+                "    raise SystemExit(0)",
+                "Path(sys.argv[-1]).write_bytes(b'jpeg')",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    script.chmod(script.stat().st_mode | stat.S_IXUSR)
+    return f"{sys.executable} {script}"
+
+
 def write_example_settings(
     tmp_path: Path,
     input_roots: list[str] | None = None,
@@ -220,6 +239,86 @@ class CliTests(unittest.TestCase):
             self.assertEqual(payload["counts"]["probedFiles"], 1)
             self.assertTrue(payload["records"][0]["itemId"].startswith("video-"))
             self.assertEqual(payload["records"][0]["ffprobe"]["summary"]["counts"]["videoStreams"], 1)
+
+    def test_sample_frames_json_writes_frame_samples_under_output_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "input" / "clip.mp4"
+            source.parent.mkdir()
+            source.write_bytes(b"video")
+            output_root = root / "output"
+            fake_ffprobe = write_fake_ffprobe(root)
+            fake_ffmpeg = write_fake_ffmpeg(root)
+            settings_path, example_path = write_example_settings(
+                root,
+                input_roots=[str(source.parent)],
+                output_root=str(output_root),
+            )
+            env = {
+                "TIMELINE_FOR_VIDEO_SETTINGS_PATH": str(settings_path),
+                "TIMELINE_FOR_VIDEO_SETTINGS_EXAMPLE_PATH": str(example_path),
+            }
+
+            exit_code, _ = run_json(["settings", "init", "--json"], env)
+            self.assertEqual(exit_code, 0)
+
+            exit_code, payload = run_json(
+                [
+                    "sample",
+                    "frames",
+                    "--json",
+                    "--ffprobe-bin",
+                    fake_ffprobe,
+                    "--ffmpeg-bin",
+                    fake_ffmpeg,
+                    "--max-items",
+                    "1",
+                    "--samples-per-video",
+                    "2",
+                ],
+                env,
+            )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(payload["counts"]["extractedFrames"], 2)
+            frame_samples = Path(payload["records"][0]["outputs"]["frameSamplesJson"])
+            self.assertTrue(frame_samples.exists())
+            self.assertTrue(str(frame_samples).startswith(str(output_root)))
+
+    def test_sample_frames_json_returns_structured_error_for_unbounded_request(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "input" / "clip.mp4"
+            source.parent.mkdir()
+            source.write_bytes(b"video")
+            output_root = root / "output"
+            settings_path, example_path = write_example_settings(
+                root,
+                input_roots=[str(source.parent)],
+                output_root=str(output_root),
+            )
+            env = {
+                "TIMELINE_FOR_VIDEO_SETTINGS_PATH": str(settings_path),
+                "TIMELINE_FOR_VIDEO_SETTINGS_EXAMPLE_PATH": str(example_path),
+            }
+
+            exit_code, _ = run_json(["settings", "init", "--json"], env)
+            self.assertEqual(exit_code, 0)
+
+            exit_code, payload = run_json(
+                [
+                    "sample",
+                    "frames",
+                    "--json",
+                    "--samples-per-video",
+                    "13",
+                ],
+                env,
+            )
+
+            self.assertEqual(exit_code, 2)
+            self.assertFalse(payload["ok"])
+            self.assertIn("samples_per_video", payload["error"])
 
 
 if __name__ == "__main__":

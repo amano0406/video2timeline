@@ -21,6 +21,7 @@ cd C:\apps\TimelineForVideo
 .\cli.ps1 doctor
 .\cli.ps1 files list
 .\cli.ps1 probe list --max-items 1
+.\cli.ps1 sample frames --max-items 1 --samples-per-video 5
 ```
 
 Stop the worker:
@@ -47,9 +48,9 @@ committed template is `settings.example.json`.
 ## Safety
 
 Source videos are read-only inputs. Current commands validate settings, check
-configured paths, discover video files by path and extension, and read ffprobe
-metadata. They do not modify, delete, copy, convert, sample, or export source
-videos.
+configured paths, discover video files by path and extension, read ffprobe
+metadata, and extract bounded review frames with ffmpeg. They do not modify,
+delete, copy, convert, transcribe, OCR, recognize, or export source videos.
 
 Milestone 2 discovery supports file inputs and recursive directory inputs for:
 
@@ -60,6 +61,22 @@ Milestone 2 discovery supports file inputs and recursive directory inputs for:
 Milestone 3 probing uses ffprobe for read-only metadata only. Source
 fingerprints and item ids are derived from path, size, and modification time;
 full-file content hashing is not performed by default for large-video safety.
+
+Milestone 4 sampling writes generated artifacts only under `outputRoot`:
+
+```text
+<outputRoot>/
+  items/
+    <item-id>/
+      raw_outputs/
+        frame_samples.json
+      artifacts/
+        contact_sheet.jpg
+        frames/
+          frame-000001.jpg
+```
+
+The default sampling command is bounded to one video and five frames per video.
 
 ## Design Docs
 

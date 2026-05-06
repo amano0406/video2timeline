@@ -14,6 +14,12 @@ from .discovery import (
     discover_video_files,
 )
 from .probe import ffprobe_version, probe_video_files
+from .sampling import (
+    DEFAULT_MAX_ITEMS,
+    DEFAULT_SAMPLES_PER_VIDEO,
+    MAX_SAMPLES_PER_VIDEO,
+    sample_video_files,
+)
 from .settings import (
     PRODUCT_NAME,
     SettingsError,
@@ -67,6 +73,27 @@ def build_parser() -> argparse.ArgumentParser:
     probe_list_parser.add_argument("--max-items", type=int, default=None, help="Limit probed files.")
     probe_list_parser.add_argument("--json", action="store_true", help="Emit JSON output.")
     probe_list_parser.set_defaults(handler=handle_probe_list)
+
+    sample_parser = subparsers.add_parser("sample", help="Extract bounded review frames.")
+    sample_subparsers = sample_parser.add_subparsers(dest="sample_command", required=True)
+
+    sample_frames_parser = sample_subparsers.add_parser("frames", help="Extract bounded frame samples.")
+    sample_frames_parser.add_argument("--ffprobe-bin", default="ffprobe", help="ffprobe command path.")
+    sample_frames_parser.add_argument("--ffmpeg-bin", default="ffmpeg", help="ffmpeg command path.")
+    sample_frames_parser.add_argument(
+        "--max-items",
+        type=int,
+        default=DEFAULT_MAX_ITEMS,
+        help=f"Limit sampled videos. Default: {DEFAULT_MAX_ITEMS}.",
+    )
+    sample_frames_parser.add_argument(
+        "--samples-per-video",
+        type=int,
+        default=DEFAULT_SAMPLES_PER_VIDEO,
+        help=f"Frames per video, 1-{MAX_SAMPLES_PER_VIDEO}. Default: {DEFAULT_SAMPLES_PER_VIDEO}.",
+    )
+    sample_frames_parser.add_argument("--json", action="store_true", help="Emit JSON output.")
+    sample_frames_parser.set_defaults(handler=handle_sample_frames)
 
     serve_parser = subparsers.add_parser("serve", help="Keep the worker container alive.")
     serve_parser.add_argument(
@@ -283,6 +310,64 @@ def handle_probe_list(args: argparse.Namespace) -> int:
                 print(f"        error: {record['ffprobe']['error']}")
 
     return 0 if payload["ok"] else 1
+
+
+def handle_sample_frames(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    discovery = discover_video_files(settings)
+    try:
+        result = sample_video_files(
+            discovery.files,
+            settings["outputRoot"],
+            ffprobe_bin=args.ffprobe_bin,
+            ffmpeg_bin=args.ffmpeg_bin,
+            max_items=args.max_items,
+            samples_per_video=args.samples_per_video,
+        )
+    except (OSError, ValueError) as exc:
+        payload = {
+            "ok": False,
+            "settingsPath": str(settings_path()),
+            "error": str(exc),
+            "discovery": discovery.to_dict(),
+        }
+        if args.json:
+            emit_json(payload)
+        else:
+            print(f"Sampling failed: {exc}")
+        return 2
+
+    payload = {
+        "settingsPath": str(settings_path()),
+        "discovery": discovery.to_dict(),
+        **result,
+    }
+
+    if args.json:
+        emit_json(payload)
+    else:
+        print(
+            f"Sampled {result['counts']['sampledItems']} of "
+            f"{result['counts']['discoveredFiles']} discovered video file(s)."
+        )
+        if result["counts"]["skippedByMaxItems"]:
+            print(f"Skipped by --max-items: {result['counts']['skippedByMaxItems']}")
+        print(f"Extracted frames: {result['counts']['extractedFrames']}")
+        print(f"Failed frames: {result['counts']['failedFrames']}")
+        print("")
+        for record in result["records"]:
+            status = "OK" if record["ok"] else "FAIL"
+            print(
+                f"  [{status}] {record['itemId']} "
+                f"frames={record['counts']['extractedFrames']}/"
+                f"{record['counts']['requestedFrames']}"
+            )
+            print(f"        frame_samples: {record['outputs']['frameSamplesJson']}")
+            print(f"        contact_sheet: {record['outputs']['contactSheet']}")
+            for warning in record["warnings"]:
+                print(f"        warning: {warning}")
+
+    return 0 if result["ok"] else 1
 
 
 def handle_serve(args: argparse.Namespace) -> int:
