@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "timeline-for-video-worker"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+timeline-for-video = "timeline_for_video_worker.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

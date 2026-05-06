@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "inputRoots": [
+    "C:\\TimelineData\\input-video\\"
+  ],
+  "outputRoot": "C:\\TimelineData\\video"
+}
