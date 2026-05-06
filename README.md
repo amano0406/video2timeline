@@ -20,6 +20,7 @@ cd C:\apps\TimelineForVideo
 .\cli.ps1 settings save --input-root C:\TimelineData\input-video --output-root C:\TimelineData\video
 .\cli.ps1 doctor
 .\cli.ps1 files list
+.\cli.ps1 probe list --max-items 1
 ```
 
 Stop the worker:
@@ -45,15 +46,20 @@ committed template is `settings.example.json`.
 
 ## Safety
 
-Source videos are read-only inputs. Current commands only validate settings,
-check configured paths, and discover video files by path and extension. They do
-not modify, delete, copy, convert, probe, sample, or export source videos.
+Source videos are read-only inputs. Current commands validate settings, check
+configured paths, discover video files by path and extension, and read ffprobe
+metadata. They do not modify, delete, copy, convert, sample, or export source
+videos.
 
 Milestone 2 discovery supports file inputs and recursive directory inputs for:
 
 ```text
 .avi .m4v .mkv .mov .mp4 .webm .wmv
 ```
+
+Milestone 3 probing uses ffprobe for read-only metadata only. Source
+fingerprints and item ids are derived from path, size, and modification time;
+full-file content hashing is not performed by default for large-video safety.
 
 ## Design Docs
 

@@ -5,11 +5,40 @@ import io
 import json
 import os
 from pathlib import Path
+import stat
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
 
 from timeline_for_video_worker.cli import main
+
+
+FFPROBE_FIXTURE = {
+    "streams": [
+        {"index": 0, "codec_type": "video", "codec_name": "h264", "width": 320, "height": 180},
+    ],
+    "format": {"format_name": "mov,mp4", "duration": "1.000000", "size": "5"},
+}
+
+
+def write_fake_ffprobe(directory: Path) -> str:
+    script = directory / "fake_ffprobe.py"
+    script.write_text(
+        "\n".join(
+            [
+                "import json",
+                "import sys",
+                "if '-version' in sys.argv:",
+                "    print('ffprobe fake 1.0')",
+                "else:",
+                f"    print(json.dumps({FFPROBE_FIXTURE!r}))",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    script.chmod(script.stat().st_mode | stat.S_IXUSR)
+    return f"{sys.executable} {script}"
 
 
 def write_example_settings(
@@ -118,6 +147,7 @@ class CliTests(unittest.TestCase):
             root = Path(temp_dir)
             source = root / "clip.mov"
             source.write_bytes(b"video")
+            fake_ffprobe = write_fake_ffprobe(root)
             settings_path, example_path = write_example_settings(
                 root,
                 input_roots=[str(root)],
@@ -131,16 +161,18 @@ class CliTests(unittest.TestCase):
             exit_code, _ = run_json(["settings", "init", "--json"], env)
             self.assertEqual(exit_code, 0)
 
-            exit_code, payload = run_json(["doctor", "--json"], env)
+            exit_code, payload = run_json(["doctor", "--json", "--ffprobe-bin", fake_ffprobe], env)
 
             self.assertEqual(exit_code, 0)
             self.assertIs(payload["ok"], True)
             self.assertEqual(payload["discovery"]["counts"]["files"], 1)
+            self.assertTrue(payload["ffprobeVersion"]["ok"])
 
     def test_doctor_json_fails_for_missing_input_root(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             missing = root / "missing"
+            fake_ffprobe = write_fake_ffprobe(root)
             settings_path, example_path = write_example_settings(
                 root,
                 input_roots=[str(missing)],
@@ -154,11 +186,40 @@ class CliTests(unittest.TestCase):
             exit_code, _ = run_json(["settings", "init", "--json"], env)
             self.assertEqual(exit_code, 0)
 
-            exit_code, payload = run_json(["doctor", "--json"], env)
+            exit_code, payload = run_json(["doctor", "--json", "--ffprobe-bin", fake_ffprobe], env)
 
             self.assertEqual(exit_code, 1)
             self.assertIs(payload["ok"], False)
-            self.assertIn("missing", payload["checks"][2]["message"])
+            self.assertIn("missing", payload["checks"][3]["message"])
+
+    def test_probe_list_json_uses_discovered_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "clip.mp4"
+            source.write_bytes(b"video")
+            fake_ffprobe = write_fake_ffprobe(root)
+            settings_path, example_path = write_example_settings(
+                root,
+                input_roots=[str(root)],
+                output_root=str(root / "out"),
+            )
+            env = {
+                "TIMELINE_FOR_VIDEO_SETTINGS_PATH": str(settings_path),
+                "TIMELINE_FOR_VIDEO_SETTINGS_EXAMPLE_PATH": str(example_path),
+            }
+
+            exit_code, _ = run_json(["settings", "init", "--json"], env)
+            self.assertEqual(exit_code, 0)
+
+            exit_code, payload = run_json(
+                ["probe", "list", "--json", "--ffprobe-bin", fake_ffprobe],
+                env,
+            )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(payload["counts"]["probedFiles"], 1)
+            self.assertTrue(payload["records"][0]["itemId"].startswith("video-"))
+            self.assertEqual(payload["records"][0]["ffprobe"]["summary"]["counts"]["videoStreams"], 1)
 
 
 if __name__ == "__main__":

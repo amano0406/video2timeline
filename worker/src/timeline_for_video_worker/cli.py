@@ -13,6 +13,7 @@ from .discovery import (
     assess_output_root,
     discover_video_files,
 )
+from .probe import ffprobe_version, probe_video_files
 from .settings import (
     PRODUCT_NAME,
     SettingsError,
@@ -47,6 +48,7 @@ def build_parser() -> argparse.ArgumentParser:
     health_parser.set_defaults(handler=handle_health)
 
     doctor_parser = subparsers.add_parser("doctor", help="Check runtime and configured paths.")
+    doctor_parser.add_argument("--ffprobe-bin", default="ffprobe", help="ffprobe command path.")
     doctor_parser.add_argument("--json", action="store_true", help="Emit JSON output.")
     doctor_parser.set_defaults(handler=handle_doctor)
 
@@ -56,6 +58,15 @@ def build_parser() -> argparse.ArgumentParser:
     files_list_parser = files_subparsers.add_parser("list", help="List configured video files.")
     files_list_parser.add_argument("--json", action="store_true", help="Emit JSON output.")
     files_list_parser.set_defaults(handler=handle_files_list)
+
+    probe_parser = subparsers.add_parser("probe", help="Read source video metadata with ffprobe.")
+    probe_subparsers = probe_parser.add_subparsers(dest="probe_command", required=True)
+
+    probe_list_parser = probe_subparsers.add_parser("list", help="Probe configured video files.")
+    probe_list_parser.add_argument("--ffprobe-bin", default="ffprobe", help="ffprobe command path.")
+    probe_list_parser.add_argument("--max-items", type=int, default=None, help="Limit probed files.")
+    probe_list_parser.add_argument("--json", action="store_true", help="Emit JSON output.")
+    probe_list_parser.set_defaults(handler=handle_probe_list)
 
     serve_parser = subparsers.add_parser("serve", help="Keep the worker container alive.")
     serve_parser.add_argument(
@@ -145,6 +156,15 @@ def handle_doctor(args: argparse.Namespace) -> int:
         return 1
 
     checks.append({"name": "settings", "ok": True, "message": f"Settings file is valid: {target}"})
+    ffprobe_status = ffprobe_version(args.ffprobe_bin)
+    checks.append(
+        {
+            "name": "runtime.ffprobe",
+            "ok": ffprobe_status["ok"],
+            "message": ffprobe_message(ffprobe_status),
+            "details": ffprobe_status,
+        }
+    )
     discovery = discover_video_files(settings)
     output_status = assess_output_root(settings["outputRoot"])
 
@@ -179,6 +199,7 @@ def handle_doctor(args: argparse.Namespace) -> int:
             "settings": settings,
             "discovery": discovery.to_dict(),
             "outputRoot": output_status,
+            "ffprobeVersion": ffprobe_status,
         }
     )
     output_doctor(args, payload)
@@ -220,6 +241,48 @@ def handle_files_list(args: argparse.Namespace) -> int:
             print(f"  {video_file['sourcePath']} ({video_file['sizeBytes']} bytes)")
 
     return 0
+
+
+def handle_probe_list(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    discovery = discover_video_files(settings)
+    result = probe_video_files(
+        discovery.files,
+        ffprobe_bin=args.ffprobe_bin,
+        max_items=args.max_items,
+    )
+    payload = {
+        "ok": result["counts"]["failedProbes"] == 0,
+        "settingsPath": str(settings_path()),
+        "discovery": discovery.to_dict(),
+        **result,
+    }
+
+    if args.json:
+        emit_json(payload)
+    else:
+        print(
+            f"Probed {result['counts']['probedFiles']} of "
+            f"{result['counts']['discoveredFiles']} discovered video file(s)."
+        )
+        if result["counts"]["skippedByMaxItems"]:
+            print(f"Skipped by --max-items: {result['counts']['skippedByMaxItems']}")
+        print(f"ffprobe: {ffprobe_message(result['ffprobeVersion'])}")
+        print("")
+        for record in result["records"]:
+            status = "OK" if record["ffprobe"]["ok"] else "FAIL"
+            summary = record["ffprobe"]["summary"]
+            duration = summary["format"]["durationSec"] if summary else None
+            streams = summary["counts"]["streams"] if summary else 0
+            print(
+                f"  [{status}] {record['itemId']} "
+                f"{record['sourceIdentity']['sourcePath']} "
+                f"duration={duration} streams={streams}"
+            )
+            if record["ffprobe"]["error"]:
+                print(f"        error: {record['ffprobe']['error']}")
+
+    return 0 if payload["ok"] else 1
 
 
 def handle_serve(args: argparse.Namespace) -> int:
@@ -314,6 +377,12 @@ def output_root_message(output_root: dict[str, Any]) -> str:
     if not output_root["parentExists"]:
         return f"Output root parent is missing: {output_root['parentPath']}"
     return f"Output root is not writable: {output_root['configuredPath']}"
+
+
+def ffprobe_message(ffprobe_status: dict[str, Any]) -> str:
+    if ffprobe_status["ok"]:
+        return ffprobe_status["versionLine"] or "ffprobe is available"
+    return ffprobe_status["error"] or "ffprobe is not available"
 
 
 def output_doctor(args: argparse.Namespace, payload: dict[str, Any]) -> None:
