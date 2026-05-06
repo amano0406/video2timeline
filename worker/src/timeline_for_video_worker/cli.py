@@ -8,6 +8,11 @@ import time
 from typing import Any
 
 from . import __version__
+from .discovery import (
+    SUPPORTED_VIDEO_EXTENSIONS,
+    assess_output_root,
+    discover_video_files,
+)
 from .settings import (
     PRODUCT_NAME,
     SettingsError,
@@ -40,6 +45,17 @@ def build_parser() -> argparse.ArgumentParser:
     health_parser = subparsers.add_parser("health", help="Check worker health.")
     health_parser.add_argument("--json", action="store_true", help="Emit JSON output.")
     health_parser.set_defaults(handler=handle_health)
+
+    doctor_parser = subparsers.add_parser("doctor", help="Check runtime and configured paths.")
+    doctor_parser.add_argument("--json", action="store_true", help="Emit JSON output.")
+    doctor_parser.set_defaults(handler=handle_doctor)
+
+    files_parser = subparsers.add_parser("files", help="Inspect source video files.")
+    files_subparsers = files_parser.add_subparsers(dest="files_command", required=True)
+
+    files_list_parser = files_subparsers.add_parser("list", help="List configured video files.")
+    files_list_parser.add_argument("--json", action="store_true", help="Emit JSON output.")
+    files_list_parser.set_defaults(handler=handle_files_list)
 
     serve_parser = subparsers.add_parser("serve", help="Keep the worker container alive.")
     serve_parser.add_argument(
@@ -88,6 +104,121 @@ def handle_health(args: argparse.Namespace) -> int:
         "settingsPath": str(settings_path()),
     }
     emit_result(args, payload, f"{PRODUCT_NAME} worker OK")
+    return 0
+
+
+def handle_doctor(args: argparse.Namespace) -> int:
+    checks: list[dict[str, Any]] = [
+        {
+            "name": "runtime.python",
+            "ok": True,
+            "message": f"Python {platform.python_version()}",
+        }
+    ]
+
+    target = settings_path()
+    payload: dict[str, Any] = {
+        "ok": False,
+        "product": PRODUCT_NAME,
+        "version": __version__,
+        "settingsPath": str(target),
+        "supportedExtensions": list(SUPPORTED_VIDEO_EXTENSIONS),
+        "checks": checks,
+    }
+
+    if not target.exists():
+        checks.append(
+            {
+                "name": "settings",
+                "ok": False,
+                "message": f"Settings file is missing: {target}",
+            }
+        )
+        output_doctor(args, payload)
+        return 1
+
+    try:
+        settings = load_settings(target)
+    except SettingsError as exc:
+        checks.append({"name": "settings", "ok": False, "message": str(exc)})
+        output_doctor(args, payload)
+        return 1
+
+    checks.append({"name": "settings", "ok": True, "message": f"Settings file is valid: {target}"})
+    discovery = discover_video_files(settings)
+    output_status = assess_output_root(settings["outputRoot"])
+
+    for root in discovery.input_roots:
+        root_ok = (
+            root.exists
+            and root.readable
+            and root.kind in {"file", "directory"}
+            and "unsupported_extension" not in root.warnings
+        )
+        checks.append(
+            {
+                "name": "input_root",
+                "ok": root_ok,
+                "message": input_root_message(root.to_dict()),
+                "details": root.to_dict(),
+            }
+        )
+
+    checks.append(
+        {
+            "name": "output_root",
+            "ok": output_status["ok"],
+            "message": output_root_message(output_status),
+            "details": output_status,
+        }
+    )
+
+    payload.update(
+        {
+            "ok": all(check["ok"] for check in checks),
+            "settings": settings,
+            "discovery": discovery.to_dict(),
+            "outputRoot": output_status,
+        }
+    )
+    output_doctor(args, payload)
+    return 0 if payload["ok"] else 1
+
+
+def handle_files_list(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    discovery = discover_video_files(settings)
+    payload = {
+        "ok": True,
+        "settingsPath": str(settings_path()),
+        **discovery.to_dict(),
+    }
+
+    if args.json:
+        emit_json(payload)
+        return 0
+
+    print(f"Found {payload['counts']['files']} video file(s).")
+    print(f"Supported extensions: {', '.join(SUPPORTED_VIDEO_EXTENSIONS)}")
+    print("")
+    print("Input roots:")
+    for root in payload["inputRoots"]:
+        status = "OK" if root["exists"] and root["readable"] and root["kind"] in {"file", "directory"} else "ISSUE"
+        print(
+            f"  [{status}] {root['configuredPath']} "
+            f"({root['kind']}, {root['videoFileCount']} video file(s))"
+        )
+        if root["resolvedPath"] != root["configuredPath"]:
+            print(f"        resolved: {root['resolvedPath']}")
+        for warning in root["warnings"]:
+            print(f"        warning: {warning}")
+
+    if payload["files"]:
+        print("")
+        print("Files:")
+        for video_file in payload["files"]:
+            print(f"  {video_file['sourcePath']} ({video_file['sizeBytes']} bytes)")
+
     return 0
 
 
@@ -159,6 +290,41 @@ def handle_settings_save(args: argparse.Namespace) -> int:
     }
     emit_result(args, payload, f"Saved: {target}")
     return 0
+
+
+def input_root_message(root: dict[str, Any]) -> str:
+    if not root["exists"]:
+        return f"Input root is missing: {root['configuredPath']}"
+    if not root["readable"]:
+        return f"Input root is not readable: {root['configuredPath']}"
+    if root["kind"] not in {"file", "directory"}:
+        return f"Input root is not a file or directory: {root['configuredPath']}"
+    if "unsupported_extension" in root["warnings"]:
+        return f"Input file extension is not supported: {root['configuredPath']}"
+    return f"Input root is readable: {root['configuredPath']}"
+
+
+def output_root_message(output_root: dict[str, Any]) -> str:
+    if output_root["ok"] and output_root["exists"]:
+        return f"Output root exists and is writable: {output_root['configuredPath']}"
+    if output_root["ok"]:
+        return f"Output root can be created under existing parent: {output_root['configuredPath']}"
+    if output_root["kind"] == "file":
+        return f"Output root points to a file: {output_root['configuredPath']}"
+    if not output_root["parentExists"]:
+        return f"Output root parent is missing: {output_root['parentPath']}"
+    return f"Output root is not writable: {output_root['configuredPath']}"
+
+
+def output_doctor(args: argparse.Namespace, payload: dict[str, Any]) -> None:
+    if args.json:
+        emit_json(payload)
+        return
+
+    print(f"Doctor: {'OK' if payload['ok'] else 'ISSUES FOUND'}")
+    for check in payload["checks"]:
+        status = "OK" if check["ok"] else "FAIL"
+        print(f"  [{status}] {check['name']}: {check['message']}")
 
 
 def run(argv: list[str] | None = None) -> int:

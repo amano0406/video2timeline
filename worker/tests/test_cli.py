@@ -12,15 +12,19 @@ from unittest.mock import patch
 from timeline_for_video_worker.cli import main
 
 
-def write_example_settings(tmp_path: Path) -> tuple[Path, Path]:
+def write_example_settings(
+    tmp_path: Path,
+    input_roots: list[str] | None = None,
+    output_root: str | None = None,
+) -> tuple[Path, Path]:
     settings_path = tmp_path / "settings.json"
     example_path = tmp_path / "settings.example.json"
     example_path.write_text(
         json.dumps(
             {
                 "schemaVersion": 1,
-                "inputRoots": ["C:\\TimelineData\\input-video\\"],
-                "outputRoot": "C:\\TimelineData\\video",
+                "inputRoots": input_roots or ["C:\\TimelineData\\input-video\\"],
+                "outputRoot": output_root or "C:\\TimelineData\\video",
             }
         ),
         encoding="utf-8",
@@ -84,6 +88,77 @@ class CliTests(unittest.TestCase):
 
             saved = json.loads(settings_path.read_text(encoding="utf-8"))
             self.assertEqual(saved, save_payload["settings"])
+
+    def test_files_list_json_uses_settings_input_roots(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "clip.mp4"
+            source.write_bytes(b"video")
+            settings_path, example_path = write_example_settings(
+                root,
+                input_roots=[str(root)],
+                output_root=str(root / "out"),
+            )
+            env = {
+                "TIMELINE_FOR_VIDEO_SETTINGS_PATH": str(settings_path),
+                "TIMELINE_FOR_VIDEO_SETTINGS_EXAMPLE_PATH": str(example_path),
+            }
+
+            exit_code, _ = run_json(["settings", "init", "--json"], env)
+            self.assertEqual(exit_code, 0)
+
+            exit_code, payload = run_json(["files", "list", "--json"], env)
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(payload["counts"]["files"], 1)
+            self.assertEqual(payload["files"][0]["resolvedPath"], str(source))
+
+    def test_doctor_json_reports_ok_for_existing_input_and_output_parent(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "clip.mov"
+            source.write_bytes(b"video")
+            settings_path, example_path = write_example_settings(
+                root,
+                input_roots=[str(root)],
+                output_root=str(root / "out"),
+            )
+            env = {
+                "TIMELINE_FOR_VIDEO_SETTINGS_PATH": str(settings_path),
+                "TIMELINE_FOR_VIDEO_SETTINGS_EXAMPLE_PATH": str(example_path),
+            }
+
+            exit_code, _ = run_json(["settings", "init", "--json"], env)
+            self.assertEqual(exit_code, 0)
+
+            exit_code, payload = run_json(["doctor", "--json"], env)
+
+            self.assertEqual(exit_code, 0)
+            self.assertIs(payload["ok"], True)
+            self.assertEqual(payload["discovery"]["counts"]["files"], 1)
+
+    def test_doctor_json_fails_for_missing_input_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            missing = root / "missing"
+            settings_path, example_path = write_example_settings(
+                root,
+                input_roots=[str(missing)],
+                output_root=str(root / "out"),
+            )
+            env = {
+                "TIMELINE_FOR_VIDEO_SETTINGS_PATH": str(settings_path),
+                "TIMELINE_FOR_VIDEO_SETTINGS_EXAMPLE_PATH": str(example_path),
+            }
+
+            exit_code, _ = run_json(["settings", "init", "--json"], env)
+            self.assertEqual(exit_code, 0)
+
+            exit_code, payload = run_json(["doctor", "--json"], env)
+
+            self.assertEqual(exit_code, 1)
+            self.assertIs(payload["ok"], False)
+            self.assertIn("missing", payload["checks"][2]["message"])
 
 
 if __name__ == "__main__":

@@ -18,6 +18,8 @@ cd C:\apps\TimelineForVideo
 .\cli.ps1 settings init
 .\cli.ps1 settings status
 .\cli.ps1 settings save --input-root C:\TimelineData\input-video --output-root C:\TimelineData\video
+.\cli.ps1 doctor
+.\cli.ps1 files list
 ```
 
 Stop the worker:
@@ -43,9 +45,15 @@ committed template is `settings.example.json`.
 
 ## Safety
 
-Source videos are read-only inputs. Milestone 1 only scaffolds the worker,
-Docker runtime, launchers, `health`, and `settings init/status/save`; it does
-not inspect, modify, delete, convert, copy, or export source videos.
+Source videos are read-only inputs. Current commands only validate settings,
+check configured paths, and discover video files by path and extension. They do
+not modify, delete, copy, convert, probe, sample, or export source videos.
+
+Milestone 2 discovery supports file inputs and recursive directory inputs for:
+
+```text
+.avi .m4v .mkv .mov .mp4 .webm .wmv
+```
 
 ## Design Docs
 
