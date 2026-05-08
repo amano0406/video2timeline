@@ -4,6 +4,7 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/workspace/worker/src
 ENV TIMELINE_FOR_VIDEO_IN_DOCKER=1
+ENV TIMELINE_FOR_VIDEO_WORKER_FLAVOR=gpu
 
 WORKDIR /workspace
 
@@ -16,8 +17,8 @@ RUN apt-get update \
         tesseract-ocr-jpn \
     && rm -rf /var/lib/apt/lists/*
 
-COPY worker/requirements-audio-models-cpu.txt /workspace/worker/requirements-audio-models-cpu.txt
-RUN pip install --no-cache-dir -r /workspace/worker/requirements-audio-models-cpu.txt
+COPY worker/requirements-audio-models-gpu.txt /workspace/worker/requirements-audio-models-gpu.txt
+RUN pip install --no-cache-dir -r /workspace/worker/requirements-audio-models-gpu.txt
 
 COPY worker/pyproject.toml /workspace/worker/pyproject.toml
 COPY worker/src /workspace/worker/src

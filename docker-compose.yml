@@ -8,16 +8,26 @@ services:
       dockerfile: docker/worker.Dockerfile
     environment:
       TIMELINE_FOR_VIDEO_IN_DOCKER: "1"
+      TIMELINE_FOR_VIDEO_WORKER_FLAVOR: cpu
       TIMELINE_FOR_VIDEO_SETTINGS_PATH: ${TIMELINE_FOR_VIDEO_SETTINGS_PATH:-/workspace/settings.json}
       TIMELINE_FOR_VIDEO_SETTINGS_EXAMPLE_PATH: ${TIMELINE_FOR_VIDEO_SETTINGS_EXAMPLE_PATH:-/workspace/settings.example.json}
       TIMELINE_FOR_VIDEO_INTERNAL_STATE_ROOT: ${TIMELINE_FOR_VIDEO_INTERNAL_STATE_ROOT:-/shared/app-data/timeline-for-video-state}
       TIMELINE_FOR_VIDEO_WORKER_INTERVAL_SECONDS: ${TIMELINE_FOR_VIDEO_WORKER_INTERVAL_SECONDS:-60}
+      TIMELINE_FOR_VIDEO_WORKER_MAX_ITEMS: ${TIMELINE_FOR_VIDEO_WORKER_MAX_ITEMS:-1}
+      TIMELINE_FOR_VIDEO_WORKER_SAMPLES_PER_VIDEO: ${TIMELINE_FOR_VIDEO_WORKER_SAMPLES_PER_VIDEO:-5}
       PYTHONPATH: /workspace/worker/src
+      HF_HOME: /shared/cache/huggingface
+      HUGGINGFACE_HUB_CACHE: /shared/cache/huggingface/hub
+      TORCH_HOME: /shared/cache/torch
+      XDG_CACHE_HOME: /shared/cache/xdg
     volumes:
       - ./:/workspace
       - type: bind
         source: ${TIMELINE_FOR_VIDEO_C_DRIVE_MOUNT:-/mnt/c}
         target: /mnt/c
+      - type: bind
+        source: ${TIMELINE_FOR_VIDEO_F_DRIVE_MOUNT:-/mnt/f}
+        target: /mnt/f
       - app-data:/shared/app-data
       - cache-data:/shared/cache
 

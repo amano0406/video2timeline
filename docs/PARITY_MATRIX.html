@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TimelineForVideo AI / Preprocessing Parity Matrix</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --line: #d9dde5;
+      --text: #17202f;
+      --muted: #5b6472;
+      --ok: #157f3b;
+      --partial: #a15c00;
+      --missing: #b3261e;
+      --na: #526070;
+      --code-bg: #eef1f5;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", "Yu Gothic UI", Meiryo, sans-serif;
+      line-height: 1.55;
+    }
+
+    main {
+      width: min(1500px, calc(100vw - 40px));
+      margin: 28px auto 48px;
+    }
+
+    h1,
+    h2,
+    h3 {
+      margin: 0;
+      line-height: 1.25;
+    }
+
+    h1 {
+      font-size: 28px;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin-top: 28px;
+      font-size: 20px;
+    }
+
+    h3 {
+      font-size: 15px;
+    }
+
+    p {
+      margin: 8px 0 0;
+    }
+
+    code {
+      background: var(--code-bg);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-family: Consolas, "Cascadia Mono", monospace;
+      font-size: 0.94em;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      margin-top: 18px;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(150px, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .metric {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+    }
+
+    .metric .value {
+      font-size: 30px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .metric .label {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 6px;
+    }
+
+    .ok {
+      color: var(--ok);
+    }
+
+    .partial {
+      color: var(--partial);
+    }
+
+    .missing {
+      color: var(--missing);
+    }
+
+    .na {
+      color: var(--na);
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 10px;
+      background: var(--panel);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-top: 12px;
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid var(--line);
+      border-right: 1px solid var(--line);
+      padding: 10px;
+      vertical-align: top;
+      overflow-wrap: anywhere;
+    }
+
+    th:last-child,
+    td:last-child {
+      border-right: 0;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    th {
+      background: #eef2f7;
+      text-align: left;
+      font-size: 13px;
+      color: #273244;
+    }
+
+    td {
+      font-size: 13px;
+    }
+
+    .status {
+      font-size: 20px;
+      font-weight: 700;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .category {
+      font-weight: 700;
+      color: #273244;
+    }
+
+    .todo-list {
+      margin: 10px 0 0;
+      padding-left: 20px;
+    }
+
+    .todo-list li {
+      margin: 6px 0;
+    }
+
+    .note {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .sources {
+      columns: 2;
+      column-gap: 28px;
+      margin: 10px 0 0;
+      padding-left: 20px;
+    }
+
+    .sources li {
+      break-inside: avoid;
+      margin-bottom: 6px;
+    }
+
+    @media (max-width: 900px) {
+      main {
+        width: min(100vw - 24px, 1500px);
+      }
+
+      .summary {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      table {
+        display: block;
+        overflow-x: auto;
+      }
+
+      th,
+      td {
+        min-width: 160px;
+      }
+
+      .sources {
+        columns: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>TimelineForVideo AI / Preprocessing Parity Matrix</h1>
+      <p class="note">作成日: 2026-05-07 / 目的: TimelineForAudio と TimelineForImage のAI・前処理契約が、TimelineForVideoで同等に動いているかを丸バツ確認する。</p>
+      <p class="note">参照元は読み取り専用で確認した。TimelineForVideo は TimelineForAudio/Image のコードを import せず、共有ライブラリ化もしていない。</p>
+    </header>
+
+    <section class="summary" aria-label="判定サマリー">
+      <div class="metric">
+        <div class="value ok">25</div>
+        <div class="label">○ 実装または契約が一致</div>
+      </div>
+      <div class="metric">
+        <div class="value partial">0</div>
+        <div class="label">△ 未解消の差分</div>
+      </div>
+      <div class="metric">
+        <div class="value missing">0</div>
+        <div class="label">× 未実装または不一致</div>
+      </div>
+      <div class="metric">
+        <div class="value na">25</div>
+        <div class="label">確認項目合計</div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>判定基準</h2>
+      <div class="legend">
+        <span class="badge ok">○ 同じ契約または同じ処理方針で実装済み</span>
+        <span class="badge partial">△ 動くが、参照製品と処理単位・入力・既定値・検証状態に差分がある</span>
+        <span class="badge missing">× 現状は参照製品と同じロジックではない</span>
+        <span class="badge na">N/A v1対象外またはVideo固有処理</span>
+      </div>
+      <p class="note">この表では「同じロジック」を、コード共有ではなく「同じ入力前処理、同じモデル、同じ失敗時契約、同じ公開フィールドで動くこと」として扱う。</p>
+    </section>
+
+    <section>
+      <h2>比較表</h2>
+      <table aria-label="AI and preprocessing parity">
+        <thead>
+          <tr>
+            <th style="width: 8%;">区分</th>
+            <th style="width: 16%;">比較項目</th>
+            <th style="width: 22%;">参照製品の契約</th>
+            <th style="width: 22%;">TimelineForVideoの現状</th>
+            <th style="width: 6%;">判定</th>
+            <th style="width: 14%;">根拠</th>
+            <th style="width: 12%;">次アクション</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="category">Audio</td>
+            <td>モデル・依存の棚卸し</td>
+            <td><code>models list</code> で pyannote、ZIPA、FFmpeg、GPU条件を確認できる。</td>
+            <td>Videoの <code>models list --json</code> はローカル処理と音声モデルを返す。<code>audioModelMode: required</code> ではpyannote/ZIPAも必須扱いになる。</td>
+            <td class="status ok">○</td>
+            <td><code>model_inventory.py</code>, Docker実行結果</td>
+            <td>なし。</td>
+          </tr>
+          <tr>
+            <td class="category">Audio</td>
+            <td>ffprobeメタデータとsource identity</td>
+            <td>Audioは処理前に <code>ffprobe</code> でメディア情報を読む。</td>
+            <td>Videoはsource videoを読み取り専用で <code>ffprobe</code> し、source identity / fingerprintを生成する。</td>
+            <td class="status ok">○</td>
+            <td><code>probe.py</code>, <code>docs/PIPELINE.md</code></td>
+            <td>なし。</td>
+          </tr>
+          <tr>
+            <td class="category">Audio</td>
+            <td>モデル入力前処理</td>
+            <td>Audioは <code>ffmpeg</code> で正規化WAVを作り、モデル処理は正規化WAVを読む。正規化WAVは処理中間物でmaster artifactにしない。</td>
+            <td>Videoはレビュー用MP3とは別に一時正規化WAVを作り、pyannote/ZIPAはそのWAVを読む。WAVは処理後に削除され、master artifactに残さない。</td>
+            <td class="status ok">○</td>
+            <td>Audio <code>processor.py</code> / Video <code>audio_analysis.py</code></td>
+            <td>なし。</td>
+          </tr>
+          <tr>
+            <td class="category">Audio</td>
+            <td>speech candidate検出</td>
+            <td>Audioは正規化WAVから候補区間を作り、候補マップを処理中だけ保持する。</td>
+            <td>Videoは一時正規化WAVを起点に <code>ffmpeg silencedetect</code> を実行し、候補区間を構造化証跡として保存する。</td>
+            <td class="status ok">○</td>
+            <td><code>trim_audio</code> / <code>run_silence_detect</code></td>
+            <td>なし。</td>
+          </tr>
+          <tr>
+            <td class="category">Audio</td>
+            <td>speaker diarizationモデル</td>
+            <td><code>pyannote/speaker-diarization-community-1</code> で機械的speaker turnを作る。</td>
+            <td>Videoも同じモデルIDを使う。依存とHugging Face tokenが揃うと実行される。</td>
+            <td class="status ok">○</td>
+            <td><code>audio_models.py</code></td>
+            <td>なし。</td>
+          </tr>
+          <tr>
+            <td class="category">Audio</td>
+            <td>diarization必須性と失敗契約</td>
+            <td>Audioではdiarizationは必須。失敗時にfallback speakerを捏造しない。</td>
+            <td>Videoの既定は <code>required</code>。pyannote/ZIPAが実行できない場合はmaster完成扱いにせず、fallback speakerやphone tokenを作らない。</td>
+            <td class="status ok">○</td>
+            <td>Audio <code>docs/PIPELINE.md</code> / Video <code>audio_models.py</code></td>
+            <td>なし。</td>
+          </tr>
+          <tr>
+            <td class="category">Audio</td>
+            <td>ZIPA acoustic units</td>
+            <td><code>anyspeech/zipa-large-crctc-300k</code> をONNX Runtimeで実行し、公開フィールドは <code>phone_tokens</code>。</td>
+            <td>Videoも同じモデルIDと <code>phone_tokens</code> を使い、readable transcriptは作らない。</td>
+            <td class="status ok">○</td>
+            <td><code>audio_models.py</code>, <code>items.py</code></td>
+            <td>なし。</td>
+          </tr>
+          <tr>
+            <td class="category">Audio</td>
+            <td>長尺音声のchunk処理とspeaker割当</td>
+            <td>Audioは候補区間を小さく処理し、speaker turnとtimestamp overlapで統合する。</td>
+            <td>Videoは候補区間を最大30秒chunkに分け、正規化WAVからchunk単位で読み出してZIPAへ渡し、speaker interval overlapでspeakerを付ける。</td>
+            <td class="status ok">○</td>
+            <td><code>MAX_ACOUSTIC_CHUNK_SECONDS</code>, <code>speaker_for_interval</code></td>
+            <td>なし。</td>
+          </tr>
+          <tr>
+            <td class="category">Audio</td>
+            <td>GPU fail-fast</td>
+            <td>Audio GPUはCUDA/ONNX CUDA providerがなければCPUへ黙ってfallbackしない。</td>
+            <td>Videoも <code>computeMode: gpu</code> が既定。GPU worker、PyTorch CUDA、<code>CUDAExecutionProvider</code> が揃わなければ失敗し、CPUへ黙ってfallbackしない。</td>
+            <td class="status ok">○</td>
+            <td><code>docker-compose.gpu.yml</code>, <code>onnx_providers</code></td>
+            <td>なし。</td>
+          </tr>
+          <tr>
+            <td class="category">Audio</td>
+            <td>フル文字起こし非対応</td>
+            <td>Audioは読みやすい文章ではなく、phone-like acoustic unitsを保存する。</td>
+            <td>Videoも <code>readableText</code> は空で、音声テキスト証跡は <code>phone_tokens</code> に限定している。</td>
+            <td class="status ok">○</td>
+            <td><code>audio_analysis.py</code>, Audio <code>docs/PIPELINE.md</code></td>
+            <td>READMEで「音声は文字起こしではなくphone_tokens」と明記する。</td>
+          </tr>
+          <tr>
+            <td class="category">Audio</td>
+            <td>生成音声artifactとZIP除外</td>
+            <td>Audioはsource audioをZIPに含めない。</td>
+            <td>Videoはsource videoも生成MP3もZIPに含めない。生成MP3は <code>outputRoot</code> 配下のローカルレビュー用。</td>
+            <td class="status ok">○</td>
+            <td><code>items.py</code>, <code>docs/OUTPUTS.md</code></td>
+            <td>なし。</td>
+          </tr>
+          <tr>
+            <td class="category">Image</td>
+            <td>OCRエンジン</td>
+            <td>ImageはローカルTesseract <code>jpn+eng</code> を使い、外部画像APIを呼ばない。</td>
+            <td>Videoは生成フレームartifactに対してローカルTesseract <code>jpn+eng</code> を使う。</td>
+            <td class="status ok">○</td>
+            <td>Image <code>ocr.py</code> / Video <code>frame_ocr.py</code></td>
+            <td>なし。</td>
+          </tr>
+          <tr>
+            <td class="category">Image</td>
+            <td>OCR公開フィールド</td>
+            <td><code>has_text</code>, <code>full_text</code>, <code>block_id</code>, <code>bbox_norm</code>, <code>confidence</code> を使う。</td>
+            <td>Videoの <code>frame_ocr.json</code> も同じ名前のsubpayloadを出す。</td>
+            <td class="status ok">○</td>
+            <td><code>frame_ocr.py</code>, <code>docs/OUTPUTS.md</code></td>
+            <td>なし。</td>
+          </tr>
+          <tr>
+            <td class="category">Image</td>
+            <td>OCR auto失敗時の扱い</td>
+            <td>Imageのauto OCRは失敗時に空OCRとwarningsを返す。</td>
+            <td>Videoもautoでは空OCRとwarningを返し、source videoやsource frameを変更しない。</td>
+            <td class="status ok">○</td>
+            <td>Image <code>ocr.py</code> / Video <code>run_frame_ocr</code></td>
+            <td>なし。</td>
+          </tr>
+          <tr>
+            <td class="category">Image</td>
+            <td>OCR debug overlay</td>
+            <td>ImageはOCR領域のdebug overlayを生成する。</td>
+            <td>Videoも <code>artifacts/ocr/*-ocr.jpg</code> を生成する。</td>
+            <td class="status ok">○</td>
+            <td><code>write_debug_overlay</code>, <code>docs/OUTPUTS.md</code></td>
+            <td>なし。</td>
+          </tr>
+          <tr>
+            <td class="category">Image</td>
+            <td>brightness / contrast</td>
+            <td>ImageはPillowで輝度平均と標準偏差を取り、同じ閾値でdark/bright/low/highを判定する。</td>
+            <td>Videoも同じ計算と閾値を生成フレームに適用する。</td>
+            <td class="status ok">○</td>
+            <td>Image <code>quality</code> / Video <code>frame_quality</code></td>
+            <td>なし。</td>
+          </tr>
+          <tr>
+            <td class="category">Image</td>
+            <td>color palette</td>
+            <td>Imageは160px thumbnailを <code>MEDIANCUT</code> 量子化して最大8色のpaletteを作る。</td>
+            <td>Videoも160px thumbnailを <code>MEDIANCUT</code> 量子化して最大8色のpaletteを作る。</td>
+            <td class="status ok">○</td>
+            <td>Image <code>color_palette</code> / Video <code>frame_color_palette</code></td>
+            <td>なし。</td>
+          </tr>
+          <tr>
+            <td class="category">Image</td>
+            <td>3x3 color grid</td>
+            <td>Imageは3x3 gridで <code>cell_id</code>, <code>row</code>, <code>col</code>, <code>bbox_norm</code>, <code>average_color</code> を出す。</td>
+            <td>Videoも3x3 gridで <code>cell_id</code>, <code>row</code>, <code>col</code>, <code>bbox_norm</code>, <code>average_color</code> を出す。</td>
+            <td class="status ok">○</td>
+            <td>Image <code>color_grid</code> / Video <code>frame_color_grid</code></td>
+            <td>なし。</td>
+          </tr>
+          <tr>
+            <td class="category">Safety</td>
+            <td>source fileの扱い</td>
+            <td>Audio/Imageはsourceを編集せず、生成物だけをoutputRootに置く。</td>
+            <td>Videoもsource videoを変更・削除・コピーせず、生成物だけを <code>outputRoot</code> 配下へ置く。</td>
+            <td class="status ok">○</td>
+            <td><code>docs/SAFETY.md</code>, <code>docs/OUTPUTS.md</code></td>
+            <td>継続してテスト対象にする。</td>
+          </tr>
+          <tr>
+            <td class="category">Safety</td>
+            <td>外部API / 人物認識 / 顔認識</td>
+            <td>Imageは外部画像APIを呼ばず、人物認識もしない。Audioはモデル実行以外の外部解析APIを前提にしない。</td>
+            <td>VideoもOCR、pyannote、ZIPA以外のscene detection、OCR外API、人物/顔認識、外部解析APIを実装していない。</td>
+            <td class="status ok">○</td>
+            <td><code>model_inventory.py</code>, docs</td>
+            <td>なし。</td>
+          </tr>
+          <tr>
+            <td class="category">Runtime</td>
+            <td>常駐worker</td>
+            <td>Audio/ImageはDocker-firstのworker/CLI製品として動く。</td>
+            <td>Videoの <code>timeline-for-video-worker-1</code> は現在 <code>Up</code> かつ <code>healthy</code>。<code>serve</code> が定期refresh loopを持つ。</td>
+            <td class="status ok">○</td>
+            <td><code>docker compose ps</code>, <code>processor.py</code></td>
+            <td>なし。</td>
+          </tr>
+          <tr>
+            <td class="category">Runtime</td>
+            <td>実動画での現在処理状態</td>
+            <td>参照製品は対象ファイルをmaster artifactへ変換する。</td>
+            <td>Videoは常駐workerと <code>items refresh</code> でmaster artifactを作る。pipeline version更新により、既存itemも新しいAudio/Image parity契約で再処理対象になる。</td>
+            <td class="status ok">○</td>
+            <td><code>C:\TimelineData\video\items</code> 実測</td>
+            <td>全件処理の完了待ちは運用進捗として別管理。</td>
+          </tr>
+          <tr>
+            <td class="category">Runtime</td>
+            <td>一覧CLIのページング</td>
+            <td>Audio/Imageは一覧UI向けに <code>--page</code> / <code>--page-size</code> を持つ。</td>
+            <td>Videoも <code>files list</code>, <code>items list</code>, <code>runs list</code> で <code>--page</code> / <code>--page-size</code> を受け付け、JSONに <code>pagination</code> を返す。</td>
+            <td class="status ok">○</td>
+            <td><code>cli.py</code>, <code>test_cli.py</code></td>
+            <td>なし。</td>
+          </tr>
+          <tr>
+            <td class="category">Repo</td>
+            <td>コード共有・import禁止</td>
+            <td>Audio/Imageの機能をVideoにも実装するが、ソース共有はしない。</td>
+            <td>Video workerは独立実装。Audio/Image packageをimportしていない。</td>
+            <td class="status ok">○</td>
+            <td>参照調査とVideo import確認</td>
+            <td>なし。</td>
+          </tr>
+          <tr>
+            <td class="category">Output</td>
+            <td>master artifact構造</td>
+            <td>Audio/Imageはsource別itemに <code>timeline.json</code>, <code>convert_info.json</code>, record JSONを置く。</td>
+            <td>Videoは <code>video_record.json</code>, <code>timeline.json</code>, <code>convert_info.json</code>, raw_outputs, artifactsを <code>outputRoot/items/&lt;item-id&gt;</code> に置く。</td>
+            <td class="status ok">○</td>
+            <td><code>docs/OUTPUTS.md</code></td>
+            <td>なし。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h2>完了した一致化</h2>
+      <ul class="todo-list">
+        <li><strong>Audio:</strong> 一時正規化WAVをモデル入力にし、レビュー用MP3をpyannote/ZIPA入力から外した。</li>
+        <li><strong>Audio:</strong> speech candidate検出を正規化WAV起点にした。</li>
+        <li><strong>Audio:</strong> ZIPAは候補区間を最大30秒chunkとしてWAVから読み出す。</li>
+        <li><strong>Audio:</strong> <code>audioModelMode</code> の既定を <code>required</code> にした。</li>
+        <li><strong>GPU:</strong> <code>computeMode</code> の既定を <code>gpu</code> にし、Audio互換モデルはCPUへ黙ってfallbackしないようにした。</li>
+        <li><strong>CLI:</strong> <code>files list</code>, <code>items list</code>, <code>runs list</code> にページングを追加した。</li>
+        <li><strong>Image:</strong> palette量子化を <code>Image.Quantize.MEDIANCUT</code> に揃えた。</li>
+        <li><strong>Image:</strong> 3x3 gridに <code>cell_id</code> を追加した。</li>
+        <li><strong>Docs:</strong> README、Runtime、Pipeline、Output contractを新しい処理契約に合わせた。</li>
+      </ul>
+    </section>
+
+    <section class="panel">
+      <h2>最小参照ファイル</h2>
+      <ul class="sources">
+        <li><code>C:\apps\TimelineForAudio\docs\PIPELINE.md</code></li>
+        <li><code>C:\apps\TimelineForAudio\docs\RUNTIME.md</code></li>
+        <li><code>C:\apps\TimelineForAudio\worker\src\timeline_for_audio_worker\processor.py</code></li>
+        <li><code>C:\apps\TimelineForImage\docs\PIPELINE.md</code></li>
+        <li><code>C:\apps\TimelineForImage\docs\RUNTIME.md</code></li>
+        <li><code>C:\apps\TimelineForImage\worker\src\timeline_for_image_worker\ocr.py</code></li>
+        <li><code>C:\apps\TimelineForImage\worker\src\timeline_for_image_worker\image_record.py</code></li>
+        <li><code>C:\apps\TimelineForVideo\docs\PIPELINE.md</code></li>
+        <li><code>C:\apps\TimelineForVideo\docs\RUNTIME.md</code></li>
+        <li><code>C:\apps\TimelineForVideo\worker\src\timeline_for_video_worker\frame_ocr.py</code></li>
+        <li><code>C:\apps\TimelineForVideo\worker\src\timeline_for_video_worker\audio_analysis.py</code></li>
+        <li><code>C:\apps\TimelineForVideo\worker\src\timeline_for_video_worker\audio_models.py</code></li>
+        <li><code>C:\apps\TimelineForVideo\worker\src\timeline_for_video_worker\model_inventory.py</code></li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

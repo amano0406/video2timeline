@@ -16,23 +16,27 @@ Generated artifacts are written only under `outputRoot`.
 `items remove` targets known generated files:
 
 - item JSON records
-- ffprobe and frame sample raw outputs
+- ffprobe, frame sample, frame OCR, and audio analysis raw outputs
 - contact sheets
 - generated frame sample JPGs
+- generated frame OCR overlay JPGs
+- generated MP3 audio derivatives
 - generated download ZIPs
 - generated latest manifest files
 
 It prunes empty generated directories after deleting files. It does not remove
 arbitrary files from `outputRoot`.
 
-## Out Of Scope In v1
+## Processing Boundaries
+
+The v1 rebuild includes local OCR over generated frame images and source-safe
+audio derivative analysis. The generated MP3 derivative is a local artifact under
+`outputRoot`; it is removed by `items remove`, but it is not included in export
+ZIPs.
 
 The v1 rebuild intentionally excludes:
 
-- OCR
 - scene detection
 - face recognition
 - person recognition
 - external APIs
-- full transcription
-- diarization

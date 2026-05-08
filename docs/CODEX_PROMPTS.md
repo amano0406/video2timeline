@@ -39,7 +39,9 @@ C:\Codex\workspaces\dockforchatgpt\chat_conversations\snapshots\20260506-114835-
 制約:
 - 旧TimelineForVideoを復元しない
 - source videoを変更、削除、ZIP同梱しない
-- v1ではscene detection、OCR、人物認識、顔認識、外部API、フル文字起こし、diarizationを実装しない
+- TimelineForAudio/Imageは処理契約の参照元。import、共有ライブラリ化、旧Video復元は禁止
+- frame OCRとaudio evidenceはVideo内で独立実装する
+- v1ではscene detection、人物認識、顔認識、外部APIを実装しない
 - 古い互換性のためだけのパラメータやlegacy shimは作らない
 ```
 
@@ -65,4 +67,3 @@ C:\Codex\workspaces\dockforchatgpt\chat_conversations\snapshots\20260506-114835-
 - 小さく理解可能な差分にする
 - 実行できるテストを実行して結果を報告する
 ```
-

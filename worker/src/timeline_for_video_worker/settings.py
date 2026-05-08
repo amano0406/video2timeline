@@ -11,11 +11,18 @@ SCHEMA_VERSION = 1
 
 SETTINGS_PATH_ENV = "TIMELINE_FOR_VIDEO_SETTINGS_PATH"
 SETTINGS_EXAMPLE_PATH_ENV = "TIMELINE_FOR_VIDEO_SETTINGS_EXAMPLE_PATH"
+INTERNAL_STATE_ROOT_ENV = "TIMELINE_FOR_VIDEO_INTERNAL_STATE_ROOT"
+HUGGING_FACE_TOKEN_ENV = "TIMELINE_FOR_VIDEO_HUGGING_FACE_TOKEN"
+SUPPORTED_COMPUTE_MODES = ("cpu", "gpu")
+SUPPORTED_AUDIO_MODEL_MODES = ("auto", "off", "required")
 
 DEFAULT_SETTINGS: dict[str, Any] = {
     "schemaVersion": SCHEMA_VERSION,
     "inputRoots": ["C:\\TimelineData\\input-video\\"],
     "outputRoot": "C:\\TimelineData\\video",
+    "huggingFaceToken": "",
+    "computeMode": "gpu",
+    "audioModelMode": "required",
 }
 
 
@@ -39,6 +46,15 @@ def settings_example_path() -> Path:
     if configured:
         return Path(configured)
     return repo_root() / "settings.example.json"
+
+
+def internal_state_root() -> Path:
+    configured = os.environ.get(INTERNAL_STATE_ROOT_ENV)
+    if configured:
+        return Path(configured).expanduser().resolve()
+    if os.environ.get("TIMELINE_FOR_VIDEO_IN_DOCKER") == "1":
+        return Path("/shared/app-data/timeline-for-video-state")
+    return (repo_root() / ".timeline-for-video-state").resolve()
 
 
 def default_settings() -> dict[str, Any]:
@@ -95,10 +111,27 @@ def normalize_settings(raw: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(output_root_raw, str) or not output_root_raw.strip():
         raise SettingsError("outputRoot must be a non-empty path string.")
 
+    token_raw = raw.get("huggingFaceToken", "")
+    if token_raw is None:
+        token_raw = ""
+    if not isinstance(token_raw, str):
+        raise SettingsError("huggingFaceToken must be a string when configured.")
+
+    compute_mode = str(raw.get("computeMode", "gpu") or "gpu").strip().casefold()
+    if compute_mode not in SUPPORTED_COMPUTE_MODES:
+        raise SettingsError(f"computeMode must be one of: {', '.join(SUPPORTED_COMPUTE_MODES)}")
+
+    audio_model_mode = str(raw.get("audioModelMode", "required") or "required").strip().casefold()
+    if audio_model_mode not in SUPPORTED_AUDIO_MODEL_MODES:
+        raise SettingsError(f"audioModelMode must be one of: {', '.join(SUPPORTED_AUDIO_MODEL_MODES)}")
+
     return {
         "schemaVersion": SCHEMA_VERSION,
         "inputRoots": input_roots,
         "outputRoot": output_root_raw.strip(),
+        "huggingFaceToken": token_raw.strip(),
+        "computeMode": compute_mode,
+        "audioModelMode": audio_model_mode,
     }
 
 
@@ -111,3 +144,31 @@ def save_settings(settings: dict[str, Any], path: Path | None = None) -> dict[st
         encoding="utf-8",
     )
     return normalized
+
+
+def load_huggingface_token(settings: dict[str, Any] | None = None) -> str | None:
+    env_token = os.environ.get(HUGGING_FACE_TOKEN_ENV) or os.environ.get("HUGGING_FACE_HUB_TOKEN") or os.environ.get("HF_TOKEN")
+    if env_token and env_token.strip():
+        return env_token.strip()
+    if settings:
+        token = settings.get("huggingFaceToken")
+        if isinstance(token, str) and token.strip():
+            return token.strip()
+    return None
+
+
+def redact_settings(settings: dict[str, Any] | None) -> dict[str, Any] | None:
+    if settings is None:
+        return None
+    redacted = dict(settings)
+    token = redacted.get("huggingFaceToken")
+    redacted["huggingFaceToken"] = {
+        "configured": bool(isinstance(token, str) and token.strip()),
+        "source": "settings" if isinstance(token, str) and token.strip() else None,
+    }
+    if load_huggingface_token(settings) and not (isinstance(token, str) and token.strip()):
+        redacted["huggingFaceToken"] = {
+            "configured": True,
+            "source": "environment",
+        }
+    return redacted

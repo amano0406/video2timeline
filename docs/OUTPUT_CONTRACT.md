@@ -12,11 +12,18 @@
       raw_outputs/
         ffprobe.json
         frame_samples.json
+        frame_ocr.json
+        audio_analysis.json
+        activity_map.json
       artifacts/
         contact_sheet.jpg
         frames/
           frame-000001.jpg
           frame-000002.jpg
+        ocr/
+          frame-000001-ocr.jpg
+        audio/
+          source_audio.mp3
   downloads/
   latest/
 ```
@@ -28,6 +35,9 @@
 - `convert_info.json`
 - `raw_outputs/ffprobe.json`
 - `raw_outputs/frame_samples.json`
+- `raw_outputs/frame_ocr.json`
+- `raw_outputs/audio_analysis.json`
+- `raw_outputs/activity_map.json`
 - `artifacts/contact_sheet.jpg`
 
 ## video_record.json
@@ -40,6 +50,8 @@ Required top-level keys:
 - `timeline`
 - `video`
 - `audio`
+- `activity`
+- `visual`
 - `processing`
 - `segments`
 - `frames`
@@ -58,6 +70,8 @@ Required lanes:
 
 - `visual`
 - `audio`
+- `activity`
+- `text`
 
 Initial event types:
 
@@ -65,6 +79,23 @@ Initial event types:
 - `video_interval`
 - `frame_sample`
 - `audio_reference`
+- `audio_derivative`
+- `audio_speech_candidate`
+- `activity_candidate_interval`
+- `activity_skipped_interval`
+- `frame_ocr_text`
+- `audio_acoustic_units`
+
+Frame OCR text evidence uses the same OCR subpayload field names as
+TimelineForImage: `has_text`, `full_text`, `block_id`, and `bbox_norm`.
+Generated frame visual features are attached to frame records and visual lane
+events under `visual`, including `quality`, `color_palette`, and a 3x3 color
+`grid`.
+Audio acoustic-unit text evidence uses the same public token field as
+TimelineForAudio: `phone_tokens`.
+The audio-model input is a temporary normalized WAV. The generated MP3 audio
+derivative is only a review artifact and must not be used as the pyannote/ZIPA
+input.
 
 ## convert_info.json
 
@@ -78,6 +109,8 @@ Must include:
 - pipeline version
 - generation signature
 - sampling parameters
+- image processing summary including frame OCR and frame visual features
+- audio processing summary
 - output files
 - counts
 - warnings
@@ -87,3 +120,7 @@ Must include:
 
 ZIP exports must not include source videos.
 
+The generated MP3 audio derivative is retained under `outputRoot` for local
+review and generated-artifact removal, but is not included in ZIP exports.
+Temporary normalized WAV files are processing intermediates and must not remain
+in master artifacts or export ZIPs.

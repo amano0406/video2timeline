@@ -274,7 +274,7 @@ def build_record_seed(
         "segments": [],
         "frames": [],
         "text": {
-            "mode": "not_implemented_in_v1",
+            "mode": "pending_frame_ocr_and_audio_reference",
         },
         "review": {},
     }

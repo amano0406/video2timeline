@@ -102,6 +102,97 @@ class ItemsTests(unittest.TestCase):
                 samples_per_video=2,
             )
             self.assertTrue(sample_result["ok"])
+            sampled_item_root = Path(sample_result["records"][0]["outputs"]["itemRoot"])
+            (sampled_item_root / "raw_outputs" / "frame_ocr.json").write_text(
+                json.dumps(
+                    {
+                        "outputs": {"frameOcrJson": str(sampled_item_root / "raw_outputs" / "frame_ocr.json")},
+                        "ocrMode": "mock",
+                        "ocrRuntime": {"model": None},
+                        "counts": {"framesWithText": 1, "textBlocks": 1},
+                        "frames": [
+                            {
+                                "frameId": "frame-000001",
+                                "timeSec": 2.667,
+                                "source_frame_path": str(sampled_item_root / "artifacts" / "frames" / "frame-000001.jpg"),
+                                "debug_overlay_path": str(sampled_item_root / "artifacts" / "ocr" / "frame-000001-ocr.jpg"),
+                                "ocr": {
+                                    "has_text": True,
+                                    "full_text": "frame text",
+                                    "blocks": [
+                                        {
+                                            "block_id": "ocr_0001",
+                                            "text": "frame text",
+                                            "bbox_norm": [0.1, 0.1, 0.8, 0.2],
+                                            "confidence": {"score": None, "level": "unknown"},
+                                        }
+                                    ],
+                                },
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (sampled_item_root / "raw_outputs" / "audio_analysis.json").write_text(
+                json.dumps(
+                    {
+                        "outputs": {
+                            "audioAnalysisJson": str(sampled_item_root / "raw_outputs" / "audio_analysis.json")
+                        },
+                        "audioArtifact": {
+                            "ok": True,
+                            "path": str(sampled_item_root / "artifacts" / "audio" / "source_audio.mp3"),
+                            "includedInDownloadZip": False,
+                        },
+                        "speechActivity": {
+                            "counts": {"speechCandidates": 1},
+                            "speechCandidates": [
+                                {"startSec": 0.0, "endSec": 4.0, "durationSec": 4.0}
+                            ],
+                        },
+                        "diarization": {"status": "not_run"},
+                        "acousticUnits": {"status": "not_run"},
+                        "text": {
+                            "mode": "audio_reference_units",
+                            "readableText": "",
+                            "segments": [
+                                {
+                                    "start_sec": 0.0,
+                                    "end_sec": 4.0,
+                                    "speaker": "SPEAKER_00",
+                                    "phone_tokens": "ko n ni chi wa",
+                                    "unit_type": "phone_like",
+                                }
+                            ],
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            activity_map_path = sampled_item_root / "raw_outputs" / "activity_map.json"
+            activity_map_path.write_text(
+                json.dumps(
+                    {
+                        "outputs": {"activityMapJson": str(activity_map_path)},
+                        "activity": {
+                            "strategy": "audio_speech_activity_plus_visual_sentinel",
+                            "activeSegments": [{"startSec": 0.0, "endSec": 4.0}],
+                            "inactiveSegments": [{"startSec": 4.0, "endSec": 8.0}],
+                            "activeSec": 4.0,
+                            "inactiveSec": 4.0,
+                            "activeRatio": 0.5,
+                            "estimatedReductionRatio": 2.0,
+                            "counts": {
+                                "activeSegments": 1,
+                                "inactiveSegments": 1,
+                                "visualSentinels": 2,
+                            },
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
 
             refresh_result = refresh_items(
                 [video_file],
@@ -132,14 +223,31 @@ class ItemsTests(unittest.TestCase):
             self.assertEqual(video_record["schema_version"], "timeline_for_video.video_record.v1")
             self.assertIs(video_record["asset"]["source_video_modified"], False)
             self.assertEqual(len(video_record["frames"]), 2)
+            self.assertTrue(video_record["text"]["ocr"])
+            self.assertEqual(video_record["text"]["blocks"][0]["text"], "frame text")
             self.assertIn("visual", timeline["lanes"])
             self.assertIn("audio", timeline["lanes"])
+            self.assertIn("text", timeline["lanes"])
             self.assertIn("frame_sample", {event["eventType"] for event in timeline["lanes"]["visual"]})
+            self.assertIn("frame_ocr_text", {event["eventType"] for event in timeline["lanes"]["text"]})
+            self.assertIn("audio_acoustic_units", {event["eventType"] for event in timeline["lanes"]["text"]})
+            self.assertIn("audio_speech_candidate", {event["eventType"] for event in timeline["lanes"]["audio"]})
             self.assertIs(convert_info["source_video_modified"], False)
+            self.assertEqual(convert_info["ffmpegVersion"]["versionLine"], "ffmpeg fake 1.0")
             self.assertEqual(convert_info["counts"]["frames"], 2)
+            self.assertEqual(convert_info["counts"]["ocrTextBlocks"], 1)
+            self.assertEqual(convert_info["counts"]["audioSpeechCandidates"], 1)
             required_outputs = {"video_record", "timeline", "convert_info", "ffprobe_raw"}
             output_files = {entry["kind"]: entry for entry in convert_info["outputFiles"]}
             self.assertTrue(all(output_files[kind]["exists"] for kind in required_outputs))
+
+            listed = list_items(str(output_root))
+            listed_item = listed["items"][0]
+            self.assertEqual(listed_item["text"]["textBlockCount"], 1)
+            self.assertEqual(listed_item["audioAnalysis"]["speechCandidates"], 1)
+            self.assertFalse(listed_item["audioAnalysis"]["audioArtifactIncludedInDownloadZip"])
+            self.assertEqual(listed_item["activity"]["activityMapJson"], str(activity_map_path))
+            self.assertEqual(listed_item["activity"]["visualSentinels"], 2)
 
     def test_list_items_reads_video_records_from_output_root(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -178,6 +286,21 @@ class ItemsTests(unittest.TestCase):
                 samples_per_video=2,
             )
             refresh_items([video_file], str(output_root), ffprobe_bin=fake_ffprobe, max_items=1)
+            item_root = Path(sample_video_files(
+                [video_file],
+                str(output_root),
+                ffprobe_bin=fake_ffprobe,
+                ffmpeg_bin=fake_ffmpeg,
+                max_items=1,
+                samples_per_video=1,
+            )["records"][0]["outputs"]["itemRoot"])
+            audio_dir = item_root / "artifacts" / "audio"
+            audio_dir.mkdir(parents=True, exist_ok=True)
+            (audio_dir / "source_audio.mp3").write_bytes(b"mp3")
+            (item_root / "raw_outputs" / "audio_analysis.json").write_text(
+                json.dumps({"audioArtifact": {"path": str(audio_dir / "source_audio.mp3")}}),
+                encoding="utf-8",
+            )
 
             result = download_items(str(output_root))
 
@@ -188,6 +311,7 @@ class ItemsTests(unittest.TestCase):
             self.assertTrue(latest_path.exists())
             self.assertTrue(manifest_path.exists())
             self.assertFalse(result["sourceVideosIncluded"])
+            self.assertFalse(result["imageArtifactsIncluded"])
 
             with zipfile.ZipFile(archive_path) as archive:
                 names = archive.namelist()
@@ -195,8 +319,36 @@ class ItemsTests(unittest.TestCase):
             self.assertIn("manifest.json", names)
             self.assertTrue(any(name.endswith("video_record.json") for name in names))
             self.assertTrue(any(name.endswith("timeline.json") for name in names))
-            self.assertTrue(any(name.endswith("contact_sheet.jpg") for name in names))
+            self.assertFalse(any(name.casefold().endswith(".jpg") for name in names))
             self.assertFalse(any(name.casefold().endswith(".mp4") for name in names))
+            self.assertFalse(any(name.casefold().endswith(".mp3") for name in names))
+
+    def test_download_items_can_select_item_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            input_root = root / "input"
+            input_root.mkdir()
+            first = input_root / "first.mp4"
+            second = input_root / "second.mp4"
+            first.write_bytes(b"first")
+            second.write_bytes(b"second")
+            output_root = root / "output"
+            fake_ffprobe = write_fake_ffprobe(root)
+            first_file = video_file_from_path(first, str(input_root))
+            second_file = video_file_from_path(second, str(input_root))
+
+            refresh_result = refresh_items([first_file, second_file], str(output_root), ffprobe_bin=fake_ffprobe)
+            first_item_id = refresh_result["records"][0]["itemId"]
+            second_item_id = refresh_result["records"][1]["itemId"]
+
+            result = download_items(str(output_root), item_ids=[first_item_id])
+
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["counts"]["items"], 1)
+            with zipfile.ZipFile(result["archivePath"]) as archive:
+                names = archive.namelist()
+            self.assertTrue(any(name.startswith(f"items/{first_item_id}/") for name in names))
+            self.assertFalse(any(name.startswith(f"items/{second_item_id}/") for name in names))
 
     def test_remove_items_deletes_generated_artifacts_only(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -238,6 +390,33 @@ class ItemsTests(unittest.TestCase):
             self.assertEqual(source.read_bytes(), b"video")
             self.assertTrue(user_video.exists())
             self.assertEqual(user_video.read_bytes(), b"user video")
+
+    def test_remove_items_can_select_item_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            input_root = root / "input"
+            input_root.mkdir()
+            first = input_root / "first.mp4"
+            second = input_root / "second.mp4"
+            first.write_bytes(b"first")
+            second.write_bytes(b"second")
+            output_root = root / "output"
+            fake_ffprobe = write_fake_ffprobe(root)
+            first_file = video_file_from_path(first, str(input_root))
+            second_file = video_file_from_path(second, str(input_root))
+
+            refresh_result = refresh_items([first_file, second_file], str(output_root), ffprobe_bin=fake_ffprobe)
+            first_record, second_record = refresh_result["records"]
+            first_root = Path(first_record["itemRoot"])
+            second_root = Path(second_record["itemRoot"])
+
+            result = remove_items(str(output_root), item_ids=[first_record["itemId"]])
+
+            self.assertTrue(result["ok"])
+            self.assertFalse(first_root.exists())
+            self.assertTrue(second_root.exists())
+            self.assertTrue(first.exists())
+            self.assertTrue(second.exists())
 
 
 if __name__ == "__main__":

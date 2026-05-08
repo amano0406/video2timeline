@@ -17,6 +17,9 @@ $repoRoot = $PSScriptRoot
 if (-not $env:TIMELINE_FOR_VIDEO_C_DRIVE_MOUNT) {
     $env:TIMELINE_FOR_VIDEO_C_DRIVE_MOUNT = "C:\"
 }
+if (-not $env:TIMELINE_FOR_VIDEO_F_DRIVE_MOUNT) {
+    $env:TIMELINE_FOR_VIDEO_F_DRIVE_MOUNT = "F:\"
+}
 
 function Get-TfvDockerCommand {
     $dockerExe = Join-Path $env:ProgramFiles "Docker\Docker\resources\bin\docker.exe"
@@ -39,11 +42,42 @@ function Get-TfvLastExitCode {
     return [int]$global:LASTEXITCODE
 }
 
+function Get-TfvComputeMode {
+    $settingsPath = Join-Path $repoRoot "settings.json"
+    if (-not (Test-Path -LiteralPath $settingsPath)) {
+        return "gpu"
+    }
+
+    try {
+        $settings = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+        $mode = [string]$settings.computeMode
+        if ($mode.ToLowerInvariant() -eq "gpu") {
+            return "gpu"
+        }
+    } catch {
+        return "gpu"
+    }
+
+    return "gpu"
+}
+
+function Get-TfvComposeArgs {
+    $args = @("compose", "--project-directory", $repoRoot)
+    if ((Get-TfvComputeMode) -eq "gpu") {
+        $args += @("-f", (Join-Path $repoRoot "docker-compose.yml"))
+        $args += @("-f", (Join-Path $repoRoot "docker-compose.gpu.yml"))
+    }
+    return $args
+}
+
 function Test-TfvWorkerRunning {
-    param([string]$Docker)
+    param(
+        [string]$Docker,
+        [string[]]$ComposeArgs
+    )
 
     $global:LASTEXITCODE = $null
-    $services = @(& $Docker compose --project-directory $repoRoot ps --status running --services 2>$null)
+    $services = @(& $Docker @ComposeArgs ps --status running --services 2>$null)
     if ((Get-TfvLastExitCode) -ne 0) {
         return $false
     }
@@ -51,20 +85,46 @@ function Test-TfvWorkerRunning {
     return $services -contains "worker"
 }
 
-$docker = Get-TfvDockerCommand
+function Start-TfvWorker {
+    param(
+        [string]$Docker,
+        [string[]]$ComposeArgs
+    )
 
-if (Test-TfvWorkerRunning -Docker $docker) {
     $global:LASTEXITCODE = $null
-    & $docker compose --project-directory $repoRoot exec -T worker python -m timeline_for_video_worker @CliArgs
-    exit (Get-TfvLastExitCode)
+    & $Docker @ComposeArgs up -d --no-deps worker
+    if ((Get-TfvLastExitCode) -ne 0) {
+        exit (Get-TfvLastExitCode)
+    }
+}
+
+function Wait-TfvWorkerRunning {
+    param(
+        [string]$Docker,
+        [string[]]$ComposeArgs
+    )
+
+    for ($attempt = 0; $attempt -lt 30; $attempt++) {
+        if (Test-TfvWorkerRunning -Docker $Docker -ComposeArgs $ComposeArgs) {
+            return $true
+        }
+        Start-Sleep -Seconds 1
+    }
+
+    return $false
+}
+
+$docker = Get-TfvDockerCommand
+$composeArgs = Get-TfvComposeArgs
+
+if (-not (Test-TfvWorkerRunning -Docker $docker -ComposeArgs $composeArgs)) {
+    Start-TfvWorker -Docker $docker -ComposeArgs $composeArgs
+    if (-not (Wait-TfvWorkerRunning -Docker $docker -ComposeArgs $composeArgs)) {
+        Write-Error "TimelineForVideo worker did not reach running state."
+        exit 1
+    }
 }
 
 $global:LASTEXITCODE = $null
-& $docker compose --project-directory $repoRoot build worker
-if ((Get-TfvLastExitCode) -ne 0) {
-    exit (Get-TfvLastExitCode)
-}
-
-$global:LASTEXITCODE = $null
-& $docker compose --project-directory $repoRoot run --rm --no-deps worker @CliArgs
+& $docker @composeArgs exec -T worker python -m timeline_for_video_worker @CliArgs
 exit (Get-TfvLastExitCode)

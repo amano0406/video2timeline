@@ -14,6 +14,9 @@ $repoRoot = $PSScriptRoot
 if (-not $env:TIMELINE_FOR_VIDEO_C_DRIVE_MOUNT) {
     $env:TIMELINE_FOR_VIDEO_C_DRIVE_MOUNT = "C:\"
 }
+if (-not $env:TIMELINE_FOR_VIDEO_F_DRIVE_MOUNT) {
+    $env:TIMELINE_FOR_VIDEO_F_DRIVE_MOUNT = "F:\"
+}
 
 function Get-TfvDockerCommand {
     $dockerExe = Join-Path $env:ProgramFiles "Docker\Docker\resources\bin\docker.exe"
@@ -36,11 +39,42 @@ function Get-TfvLastExitCode {
     return [int]$global:LASTEXITCODE
 }
 
-$docker = Get-TfvDockerCommand
+function Get-TfvComputeMode {
+    $settingsPath = Join-Path $repoRoot "settings.json"
+    if (-not (Test-Path -LiteralPath $settingsPath)) {
+        return "gpu"
+    }
 
+    try {
+        $settings = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+        $mode = [string]$settings.computeMode
+        if ($mode.ToLowerInvariant() -eq "gpu") {
+            return "gpu"
+        }
+    } catch {
+        return "gpu"
+    }
+
+    return "gpu"
+}
+
+function Get-TfvComposeArgs {
+    $args = @("compose", "--project-directory", $repoRoot)
+    if ((Get-TfvComputeMode) -eq "gpu") {
+        $args += @("-f", (Join-Path $repoRoot "docker-compose.yml"))
+        $args += @("-f", (Join-Path $repoRoot "docker-compose.gpu.yml"))
+    }
+    return $args
+}
+
+$docker = Get-TfvDockerCommand
+$composeArgs = Get-TfvComposeArgs
+$computeMode = Get-TfvComputeMode
+
+Write-Host "Compute mode: $computeMode"
 Write-Host "Starting TimelineForVideo worker..."
 $global:LASTEXITCODE = $null
-& $docker compose --project-directory $repoRoot up -d --build
+& $docker @composeArgs up -d --remove-orphans worker
 if ((Get-TfvLastExitCode) -ne 0) {
     exit (Get-TfvLastExitCode)
 }
@@ -52,9 +86,10 @@ Write-Host "CLI examples:"
 Write-Host "  .\cli.ps1 health"
 Write-Host "  .\cli.ps1 settings init"
 Write-Host "  .\cli.ps1 settings status"
-Write-Host "  .\cli.ps1 settings save --input-root C:\TimelineData\input-video --output-root C:\TimelineData\video"
+Write-Host "  .\cli.ps1 settings save --input-root C:\Users\amano\Videos --input-root F:\Video --output-root C:\TimelineData\video"
+Write-Host "  .\cli.ps1 items refresh --max-items 1"
 Write-Host ""
 
 $global:LASTEXITCODE = $null
-& $docker compose --project-directory $repoRoot ps
+& $docker @composeArgs ps
 exit (Get-TfvLastExitCode)

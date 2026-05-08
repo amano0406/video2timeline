@@ -31,6 +31,14 @@ outputs, or included in exports.
 
 ## 6. v1 Analysis Scope
 
-For v1, capture metadata and visual samples. Do not implement transcription,
-OCR, scene detection, or recognition.
+For v1, capture metadata, bounded visual samples, local OCR over generated frame
+images, and source-safe audio evidence.
 
+Frame OCR follows the `TimelineForImage` processing contract but is implemented
+inside this repository. Video audio follows `TimelineForAudio` behavior,
+including pyannote diarization and ZIPA acoustic-unit execution paths, but is
+implemented inside this repository. Do not import or share source code between
+Timeline products.
+
+Do not implement scene detection, face recognition, person recognition, or
+external analysis APIs in v1.

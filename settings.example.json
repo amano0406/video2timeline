@@ -3,5 +3,8 @@
   "inputRoots": [
     "C:\\TimelineData\\input-video\\"
   ],
-  "outputRoot": "C:\\TimelineData\\video"
+  "outputRoot": "C:\\TimelineData\\video",
+  "huggingFaceToken": "",
+  "computeMode": "gpu",
+  "audioModelMode": "required"
 }

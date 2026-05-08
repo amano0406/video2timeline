@@ -6,7 +6,10 @@ build-backend = "setuptools.build_meta"
 name = "timeline-for-video-worker"
 version = "0.1.0"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+  "Pillow>=10,<12",
+  "pytesseract>=0.3.10,<0.4",
+]
 
 [project.scripts]
 timeline-for-video = "timeline_for_video_worker.cli:main"
