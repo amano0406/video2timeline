@@ -128,7 +128,6 @@ def write_example_settings(
                 "inputRoots": input_roots or ["C:\\TimelineData\\input-video\\"],
                 "outputRoot": output_root or "C:\\TimelineData\\video",
                 "computeMode": "cpu",
-                "audioModelMode": "auto",
             }
         ),
         encoding="utf-8",
@@ -187,8 +186,6 @@ class CliTests(unittest.TestCase):
                     "hf_test_token",
                     "--compute-mode",
                     "cpu",
-                    "--audio-model-mode",
-                    "required",
                     "--json",
                 ],
                 env,
@@ -200,7 +197,6 @@ class CliTests(unittest.TestCase):
             )
             self.assertEqual(save_payload["settings"]["outputRoot"], "E:\\TimelineVideo")
             self.assertEqual(save_payload["settings"]["computeMode"], "cpu")
-            self.assertEqual(save_payload["settings"]["audioModelMode"], "required")
             self.assertEqual(
                 save_payload["settings"]["huggingFaceToken"],
                 {"configured": True, "source": "settings"},
@@ -208,7 +204,10 @@ class CliTests(unittest.TestCase):
 
             saved = json.loads(settings_path.read_text(encoding="utf-8"))
             self.assertEqual(saved["huggingFaceToken"], "hf_test_token")
-            self.assertEqual(saved["audioModelMode"], "required")
+            self.assertEqual(
+                set(saved),
+                {"schemaVersion", "inputRoots", "outputRoot", "huggingFaceToken", "computeMode"},
+            )
 
     def test_files_list_json_uses_settings_input_roots(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -283,11 +282,12 @@ class CliTests(unittest.TestCase):
             env = {
                 "TIMELINE_FOR_VIDEO_SETTINGS_PATH": str(settings_path),
                 "TIMELINE_FOR_VIDEO_SETTINGS_EXAMPLE_PATH": str(example_path),
+                "TIMELINE_FOR_VIDEO_HUGGING_FACE_TOKEN": "",
+                "HUGGING_FACE_HUB_TOKEN": "",
+                "HF_TOKEN": "",
             }
 
             exit_code, _ = run_json(["settings", "init", "--json"], env)
-            self.assertEqual(exit_code, 0)
-            exit_code, _ = run_json(["settings", "save", "--audio-model-mode", "auto", "--json"], env)
             self.assertEqual(exit_code, 0)
 
             exit_code, payload = run_json(
@@ -304,8 +304,8 @@ class CliTests(unittest.TestCase):
                 env,
             )
 
-            self.assertEqual(exit_code, 0)
-            self.assertIs(payload["ok"], True)
+            self.assertEqual(exit_code, 1)
+            self.assertIs(payload["ok"], False)
             self.assertEqual(payload["discovery"]["counts"]["files"], 1)
             self.assertTrue(payload["ffprobeVersion"]["ok"])
             self.assertIn("audioModels", payload)
@@ -331,8 +331,6 @@ class CliTests(unittest.TestCase):
             }
 
             exit_code, _ = run_json(["settings", "init", "--json"], env)
-            self.assertEqual(exit_code, 0)
-            exit_code, _ = run_json(["settings", "save", "--audio-model-mode", "required", "--json"], env)
             self.assertEqual(exit_code, 0)
 
             exit_code, payload = run_json(
@@ -382,9 +380,9 @@ class CliTests(unittest.TestCase):
                 env,
             )
 
-            self.assertEqual(exit_code, 0)
-            self.assertTrue(payload["ok"])
-            self.assertEqual(payload["counts"]["requiredComponents"], 6)
+            self.assertEqual(exit_code, 1)
+            self.assertFalse(payload["ok"])
+            self.assertEqual(payload["counts"]["requiredComponents"], 8)
             self.assertEqual(payload["counts"]["audioModelComponents"], 2)
             components = {component["id"]: component for component in payload["components"]}
             self.assertTrue(components["frame_ocr"]["execution"]["implementedInVideoWorker"])

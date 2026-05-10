@@ -199,7 +199,7 @@ def analyze_probe_record_audio(
             ],
         },
         "audioModels": {
-            "mode": audio_model_mode or settings.get("audioModelMode") or "required",
+            "mode": audio_model_mode or "required",
             "ok": True,
             "warnings": [],
         },
@@ -217,7 +217,7 @@ def analyze_probe_record_audio(
         return write_audio_analysis(record, audio_analysis_path)
     if not audio_streams:
         warnings.append("no_audio_streams")
-        configured_mode = str(audio_model_mode or settings.get("audioModelMode") or "required").strip().casefold()
+        configured_mode = str(audio_model_mode or "required").strip().casefold()
         model_result = run_audio_reference_models(
             audio_path=audio_model_input_path,
             speech_candidates=[],

@@ -61,11 +61,11 @@ class ModelInventoryTests(unittest.TestCase):
                         "timeline_for_video_worker.model_inventory.audio_model_runtime_status",
                         return_value=audio_status(token_configured=False),
                     ):
-                        payload = build_model_inventory(settings={"audioModelMode": "auto"})
+                        payload = build_model_inventory(settings={})
 
-        self.assertTrue(payload["ok"])
-        self.assertEqual(payload["counts"]["requiredComponents"], 6)
-        self.assertEqual(payload["counts"]["readyRequiredComponents"], 6)
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["counts"]["requiredComponents"], 8)
+        self.assertEqual(payload["counts"]["readyRequiredComponents"], 7)
         self.assertEqual(payload["counts"]["audioModelComponents"], 2)
         self.assertEqual(payload["counts"]["readyAudioModelComponents"], 1)
         self.assertFalse(payload["sourceVideoSafety"]["sourceVideoModified"])
@@ -101,7 +101,7 @@ class ModelInventoryTests(unittest.TestCase):
                         "timeline_for_video_worker.model_inventory.audio_model_runtime_status",
                         return_value=audio_status(token_configured=False),
                     ):
-                        payload = build_model_inventory(settings={"audioModelMode": "auto"})
+                        payload = build_model_inventory(settings={})
 
         self.assertFalse(payload["ok"])
         components = {component["id"]: component for component in payload["components"]}

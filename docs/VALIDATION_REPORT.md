@@ -34,8 +34,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "<parse cli.ps1/start
 - Docker health: passed.
 - Docker settings status: passed with configured roots `C:\Users\amano\Videos\`
   and `F:\Video\`.
-- Model inventory unit tests: passed, including required component counts for
-  `audioModelMode` and source-safety flags.
+- Model inventory unit tests: passed, including required component counts,
+  compute mode, and source-safety flags.
 - Token redaction tests: passed for environment-token precedence and redacted
   JSON status.
 - Docker model inventory: passed, including local components, pyannote/ZIPA
@@ -71,12 +71,13 @@ The smoke test confirmed:
 - `artifacts/audio/source_audio.mp3` was written under `outputRoot`.
 - `convert_info.json` included both `ffprobeVersion` and `ffmpegVersion`.
 - `items list` reported OCR and audio-evidence counts.
-- `audioModelMode: auto` recorded `not_configured` without inventing speaker
-  turns or phone tokens when no Hugging Face token was configured.
-- `audioModelMode: required` returned a structured failure when no Hugging Face
-  token was configured.
-- `audioModelMode: required` also fails structurally when the video has no audio
-  stream.
+- Diagnostic `--audio-model-mode auto` recorded `not_configured` without
+  inventing speaker turns or phone tokens when no Hugging Face token was
+  configured.
+- Default required audio-model execution returned a structured failure when no
+  Hugging Face token was configured.
+- Required audio-model execution also fails structurally when the video has no
+  audio stream.
 - the ZIP contained generated item files and did not contain `.mp4` source video
   files or `.mp3` audio derivatives.
 - after `items remove`, the source video still existed and its size/mtime were

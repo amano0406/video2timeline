@@ -32,7 +32,6 @@ class SettingsTests(unittest.TestCase):
                 "outputRoot": "C:\\TimelineData\\video",
                 "huggingFaceToken": "",
                 "computeMode": "gpu",
-                "audioModelMode": "required",
             },
         )
 
@@ -77,7 +76,6 @@ class SettingsTests(unittest.TestCase):
                     "outputRoot": "C:\\TimelineData\\video",
                     "huggingFaceToken": "",
                     "computeMode": "cpu",
-                    "audioModelMode": "auto",
                 }
             )
 

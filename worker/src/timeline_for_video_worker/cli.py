@@ -38,7 +38,6 @@ from .settings import (
     save_settings,
     settings_example_path,
     settings_path,
-    SUPPORTED_AUDIO_MODEL_MODES,
     SUPPORTED_COMPUTE_MODES,
 )
 
@@ -227,7 +226,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--audio-model-mode",
         choices=AUDIO_MODEL_MODES,
         default=None,
-        help="Audio model execution mode. Default: settings audioModelMode.",
+        help="Audio model execution mode. Default: required.",
     )
     audio_analyze_parser.add_argument("--json", action="store_true", help="Emit JSON output.")
     audio_analyze_parser.set_defaults(handler=handle_audio_analyze)
@@ -270,7 +269,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--audio-model-mode",
         choices=AUDIO_MODEL_MODES,
         default=None,
-        help="Audio model execution mode. Default: settings audioModelMode.",
+        help="Audio model execution mode. Default: required.",
     )
     process_all_parser.add_argument("--json", action="store_true", help="Emit JSON output.")
     process_all_parser.set_defaults(handler=handle_process_all)
@@ -303,7 +302,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--audio-model-mode",
         choices=AUDIO_MODEL_MODES,
         default=None,
-        help="Audio model execution mode. Default: settings audioModelMode.",
+        help="Audio model execution mode. Default: required.",
     )
     items_refresh_parser.add_argument("--reprocess-duplicates", action="store_true", help="Process items even when catalog state is current.")
     items_refresh_parser.add_argument("--json", action="store_true", help="Emit JSON output.")
@@ -372,7 +371,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--audio-model-mode",
         choices=AUDIO_MODEL_MODES,
         default=env_choice("TIMELINE_FOR_VIDEO_WORKER_AUDIO_MODEL_MODE", None, AUDIO_MODEL_MODES),
-        help="Audio model execution mode. Default: env override or settings audioModelMode.",
+        help="Audio model execution mode. Default: TIMELINE_FOR_VIDEO_WORKER_AUDIO_MODEL_MODE or required.",
     )
     serve_parser.add_argument("--once", action="store_true", help="Run one refresh cycle and exit.")
     serve_parser.add_argument("--json", action="store_true", help="Emit JSON events.")
@@ -408,12 +407,6 @@ def build_parser() -> argparse.ArgumentParser:
         choices=SUPPORTED_COMPUTE_MODES,
         default=None,
         help="Audio model compute mode.",
-    )
-    save_parser.add_argument(
-        "--audio-model-mode",
-        choices=SUPPORTED_AUDIO_MODEL_MODES,
-        default=None,
-        help="Audio model mode.",
     )
     save_parser.add_argument("--json", action="store_true", help="Emit JSON output.")
     save_parser.set_defaults(handler=handle_settings_save)
@@ -500,7 +493,7 @@ def handle_doctor(args: argparse.Namespace) -> int:
         }
     )
     audio_model_status = audio_model_runtime_status(settings)
-    audio_model_required = settings.get("audioModelMode") == "required"
+    audio_model_required = True
     checks.append(
         {
             "name": "runtime.audio_models",
@@ -1279,9 +1272,6 @@ def handle_settings_save(args: argparse.Namespace) -> int:
         settings["huggingFaceToken"] = args.token
     if args.compute_mode is not None:
         settings["computeMode"] = args.compute_mode
-    if args.audio_model_mode is not None:
-        settings["audioModelMode"] = args.audio_model_mode
-
     settings = save_settings(settings, target)
     payload = {
         "ok": True,

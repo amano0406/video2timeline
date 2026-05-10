@@ -298,7 +298,7 @@
             <td class="category">Audio</td>
             <td>モデル・依存の棚卸し</td>
             <td><code>models list</code> で pyannote、ZIPA、FFmpeg、GPU条件を確認できる。</td>
-            <td>Videoの <code>models list --json</code> はローカル処理と音声モデルを返す。<code>audioModelMode: required</code> ではpyannote/ZIPAも必須扱いになる。</td>
+            <td>Videoの <code>models list --json</code> はローカル処理と音声モデルを返す。pyannote/ZIPAは既定で必須扱いになる。</td>
             <td class="status ok">○</td>
             <td><code>model_inventory.py</code>, Docker実行結果</td>
             <td>なし。</td>
@@ -529,7 +529,7 @@
         <li><strong>Audio:</strong> 一時正規化WAVをモデル入力にし、レビュー用MP3をpyannote/ZIPA入力から外した。</li>
         <li><strong>Audio:</strong> speech candidate検出を正規化WAV起点にした。</li>
         <li><strong>Audio:</strong> ZIPAは候補区間を最大30秒chunkとしてWAVから読み出す。</li>
-        <li><strong>Audio:</strong> <code>audioModelMode</code> の既定を <code>required</code> にした。</li>
+        <li><strong>Audio:</strong> pyannote/ZIPAの既定動作を必須にした。</li>
         <li><strong>GPU:</strong> <code>computeMode</code> の既定を <code>gpu</code> にし、Audio互換モデルはCPUへ黙ってfallbackしないようにした。</li>
         <li><strong>CLI:</strong> <code>files list</code>, <code>items list</code>, <code>runs list</code> にページングを追加した。</li>
         <li><strong>Image:</strong> palette量子化を <code>Image.Quantize.MEDIANCUT</code> に揃えた。</li>

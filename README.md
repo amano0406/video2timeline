@@ -57,8 +57,7 @@ committed template is `settings.example.json`.
   ],
   "outputRoot": "C:\\TimelineData\\video",
   "huggingFaceToken": "",
-  "computeMode": "gpu",
-  "audioModelMode": "required"
+  "computeMode": "gpu"
 }
 ```
 
@@ -152,10 +151,10 @@ compatible audio-model components. Frame OCR is executed locally with
 Tesseract. Audio derivative and speech-candidate detection are executed locally
 with ffmpeg. The generated MP3 is a review artifact only; pyannote diarization
 and ZIPA acoustic-unit extraction read a temporary normalized WAV so the audio
-model path matches TimelineForAudio's preprocessing contract. `required` is the
-default audio model mode and fails the item instead of inventing speaker turns
-or phone tokens. `auto` remains available for diagnostics and records
-`not_configured` when prerequisites are missing.
+model path matches TimelineForAudio's preprocessing contract. Audio model
+execution is required by default and fails the item instead of inventing speaker
+turns or phone tokens. Diagnostic commands may still override execution mode
+for isolated troubleshooting, but that mode is not stored in settings.
 
 Milestone 6 export and removal commands are source-safe:
 

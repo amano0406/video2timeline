@@ -30,7 +30,8 @@ class AudioModelTests(unittest.TestCase):
                     audio_path=audio_path,
                     speech_candidates=[{"startSec": 0.0, "endSec": 1.0, "durationSec": 1.0}],
                     source_name="clip.mp4",
-                    settings={"audioModelMode": "auto", "computeMode": "cpu", "huggingFaceToken": ""},
+                    settings={"computeMode": "cpu", "huggingFaceToken": ""},
+                    mode="auto",
                 )
 
             self.assertTrue(result["ok"])
@@ -52,7 +53,7 @@ class AudioModelTests(unittest.TestCase):
                     audio_path=audio_path,
                     speech_candidates=[],
                     source_name="clip.mp4",
-                    settings={"audioModelMode": "required", "computeMode": "cpu", "huggingFaceToken": ""},
+                    settings={"computeMode": "cpu", "huggingFaceToken": ""},
                 )
 
             self.assertFalse(result["ok"])
@@ -96,7 +97,7 @@ class AudioModelTests(unittest.TestCase):
                         audio_path=audio_path,
                         speech_candidates=[],
                         source_name="clip.mp4",
-                        settings={"audioModelMode": "required", "computeMode": "gpu", "huggingFaceToken": "token"},
+                        settings={"computeMode": "gpu", "huggingFaceToken": "token"},
                     )
 
             self.assertFalse(result["ok"])
@@ -204,7 +205,7 @@ class AudioModelTests(unittest.TestCase):
                                 audio_path=audio_path,
                                 speech_candidates=[],
                                 source_name="silent.mp4",
-                                settings={"audioModelMode": "required", "computeMode": "cpu", "huggingFaceToken": "token"},
+                                settings={"computeMode": "cpu", "huggingFaceToken": "token"},
                             )
 
             self.assertTrue(result["ok"])

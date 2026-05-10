@@ -87,12 +87,10 @@ normalized WAV, runs speech candidate detection on that WAV, and then runs the
 TimelineForAudio-compatible pyannote/ZIPA model path on the same WAV. The
 temporary WAV is removed after the item is processed and is not a master
 artifact.
-`audioModelMode` controls behavior:
-
-- `required`: default; fail the item when pyannote/ZIPA cannot run.
-- `auto`: run pyannote/ZIPA when dependencies and token are available; otherwise
-  record a structured reason such as `not_configured`.
-- `off`: skip pyannote/ZIPA.
+Audio model execution is required by default; the item fails when pyannote/ZIPA
+cannot run. Diagnostic commands can still pass `--audio-model-mode auto` or
+`--audio-model-mode off` for isolated troubleshooting, but that mode is not a
+settings field and is not persisted.
 
 The token can be stored in local `settings.json` with `settings save --token`
 or provided through `TIMELINE_FOR_VIDEO_HUGGING_FACE_TOKEN`,

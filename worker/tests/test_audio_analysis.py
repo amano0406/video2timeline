@@ -169,7 +169,7 @@ class AudioAnalysisTests(unittest.TestCase):
                     ffprobe_bin=fake_ffprobe(root),
                     ffmpeg_bin=fake_ffmpeg(root),
                     max_items=1,
-                    settings={"audioModelMode": "auto", "computeMode": "cpu", "huggingFaceToken": ""},
+                    settings={"computeMode": "cpu", "huggingFaceToken": ""},
                     audio_model_mode="auto",
                 )
 
@@ -213,7 +213,7 @@ class AudioAnalysisTests(unittest.TestCase):
                     ffprobe_bin=fake_ffprobe(root, FFPROBE_WITHOUT_AUDIO),
                     ffmpeg_bin=fake_ffmpeg(root),
                     max_items=1,
-                    settings={"audioModelMode": "required", "computeMode": "cpu", "huggingFaceToken": ""},
+                    settings={"computeMode": "cpu", "huggingFaceToken": ""},
                     audio_model_mode="required",
                 )
 

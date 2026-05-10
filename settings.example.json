@@ -5,6 +5,5 @@
   ],
   "outputRoot": "C:\\TimelineData\\video",
   "huggingFaceToken": "",
-  "computeMode": "gpu",
-  "audioModelMode": "required"
+  "computeMode": "gpu"
 }

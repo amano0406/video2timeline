@@ -15,7 +15,6 @@ from .audio_models import (
     DIARIZATION_BACKEND,
     DIARIZATION_MODEL_ID,
     audio_model_runtime_status,
-    normalize_audio_model_mode,
 )
 from .frame_ocr import OCR_MODEL_ID, ocr_runtime_status
 from .probe import ffprobe_version, utc_now_iso
@@ -38,8 +37,7 @@ def build_model_inventory(
     ocr_status = ocr_runtime_status(ocr_mode)
     visual_status = visual_feature_runtime_status()
     audio_model_status = audio_model_runtime_status(settings)
-    audio_model_mode = normalize_audio_model_mode(settings.get("audioModelMode") if settings else None)
-    audio_model_required = audio_model_mode == "required"
+    audio_model_required = True
     components = [
         local_component(
             component_id="ffprobe_metadata",
@@ -124,7 +122,6 @@ def build_model_inventory(
         "product": PRODUCT_NAME,
         "version": __version__,
         "generatedAt": generated_at,
-        "audioModelMode": audio_model_mode,
         "ok": all(component["runtime"]["ready"] for component in required_components),
         "sourceVideoSafety": {
             "sourceVideoModified": False,

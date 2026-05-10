@@ -150,7 +150,7 @@ def run_audio_reference_models(
     settings: dict[str, Any],
     mode: str | None = None,
 ) -> dict[str, Any]:
-    model_mode = normalize_audio_model_mode(mode or settings.get("audioModelMode"))
+    model_mode = normalize_audio_model_mode(mode)
     compute_mode = normalize_compute_mode(settings.get("computeMode"))
     generated_at = utc_now_iso()
     runtime = audio_model_runtime_status(settings)

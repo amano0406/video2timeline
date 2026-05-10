@@ -47,15 +47,16 @@ Sampling is bounded. It does not extract every frame.
 
 `ocr frames` runs local OCR over generated frame sample artifacts. `audio
 analyze` writes source-safe generated audio evidence under `outputRoot`.
-`audio analyze` uses `audioModelMode` from settings by default. `required` is
-the default and fails instead of creating fallback speakers or phone tokens.
-`auto` records a structured reason when pyannote/ZIPA cannot run; `off` skips
-those models. Model execution uses a temporary normalized WAV, not the review
-MP3 artifact. `computeMode: "gpu"` is the default, and `cli.ps1` uses the GPU
-compose layer in that mode. `activity map` writes `raw_outputs/activity_map.json`
-with merged audio activity, five-minute visual sentinel deltas, and inactive
-intervals that can be skipped. `process all` runs sampling, frame OCR, audio
-analysis, activity mapping, and item refresh in one bounded command.
+`audio analyze` requires the pyannote/ZIPA path by default and fails instead of
+creating fallback speakers or phone tokens. Diagnostic commands may still use
+`--audio-model-mode auto` or `--audio-model-mode off` for isolated
+troubleshooting, but this is not saved in settings. Model execution uses a
+temporary normalized WAV, not the review MP3 artifact. `computeMode: "gpu"` is
+the default, and `cli.ps1` uses the GPU compose layer in that mode. `activity
+map` writes `raw_outputs/activity_map.json` with merged audio activity,
+five-minute visual sentinel deltas, and inactive intervals that can be skipped.
+`process all` runs sampling, frame OCR, audio analysis, activity mapping, and
+item refresh in one bounded command.
 
 `process all` is a forced batch command. The normal product entrypoint is
 `items refresh`.

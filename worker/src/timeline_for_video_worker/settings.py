@@ -14,7 +14,6 @@ SETTINGS_EXAMPLE_PATH_ENV = "TIMELINE_FOR_VIDEO_SETTINGS_EXAMPLE_PATH"
 INTERNAL_STATE_ROOT_ENV = "TIMELINE_FOR_VIDEO_INTERNAL_STATE_ROOT"
 HUGGING_FACE_TOKEN_ENV = "TIMELINE_FOR_VIDEO_HUGGING_FACE_TOKEN"
 SUPPORTED_COMPUTE_MODES = ("cpu", "gpu")
-SUPPORTED_AUDIO_MODEL_MODES = ("auto", "off", "required")
 
 DEFAULT_SETTINGS: dict[str, Any] = {
     "schemaVersion": SCHEMA_VERSION,
@@ -22,7 +21,6 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "outputRoot": "C:\\TimelineData\\video",
     "huggingFaceToken": "",
     "computeMode": "gpu",
-    "audioModelMode": "required",
 }
 
 
@@ -121,17 +119,12 @@ def normalize_settings(raw: dict[str, Any]) -> dict[str, Any]:
     if compute_mode not in SUPPORTED_COMPUTE_MODES:
         raise SettingsError(f"computeMode must be one of: {', '.join(SUPPORTED_COMPUTE_MODES)}")
 
-    audio_model_mode = str(raw.get("audioModelMode", "required") or "required").strip().casefold()
-    if audio_model_mode not in SUPPORTED_AUDIO_MODEL_MODES:
-        raise SettingsError(f"audioModelMode must be one of: {', '.join(SUPPORTED_AUDIO_MODEL_MODES)}")
-
     return {
         "schemaVersion": SCHEMA_VERSION,
         "inputRoots": input_roots,
         "outputRoot": output_root_raw.strip(),
         "huggingFaceToken": token_raw.strip(),
         "computeMode": compute_mode,
-        "audioModelMode": audio_model_mode,
     }
 
 
