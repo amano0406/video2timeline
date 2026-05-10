@@ -298,7 +298,7 @@
             <td class="category">Audio</td>
             <td>モデル・依存の棚卸し</td>
             <td><code>models list</code> で pyannote、ZIPA、FFmpeg、GPU条件を確認できる。</td>
-            <td>Videoの <code>models list --json</code> はローカル処理と音声モデルを返す。pyannote/ZIPAは既定で必須扱いになる。</td>
+            <td>Videoの <code>models list --json</code> はAudio互換の <code>models</code> 配列、<code>pipeline.generation_signature</code>、Video固有の <code>components</code> 配列を返す。<code>--include-remote</code> でHugging Faceのlicense/gated情報も取得できる。</td>
             <td class="status ok">○</td>
             <td><code>model_inventory.py</code>, Docker実行結果</td>
             <td>なし。</td>

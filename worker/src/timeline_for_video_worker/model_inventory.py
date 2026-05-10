@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import importlib.util
+import urllib.error
+import urllib.request
+from dataclasses import asdict, dataclass
 from typing import Any
 
 from . import __version__
@@ -15,14 +20,37 @@ from .audio_models import (
     DIARIZATION_BACKEND,
     DIARIZATION_MODEL_ID,
     audio_model_runtime_status,
+    normalize_compute_mode,
 )
 from .frame_ocr import OCR_MODEL_ID, ocr_runtime_status
+from .items import PIPELINE_VERSION
 from .probe import ffprobe_version, utc_now_iso
 from .sampling import ffmpeg_version
-from .settings import PRODUCT_NAME
+from .settings import PRODUCT_NAME, load_huggingface_token
 
 
 MODEL_INVENTORY_SCHEMA_VERSION = "timeline_for_video.model_inventory.v1"
+HUGGING_FACE_MODEL_URL = "https://huggingface.co/{model_id}"
+HUGGING_FACE_MODEL_API_URL = "https://huggingface.co/api/models/{model_id}"
+
+
+@dataclass(frozen=True)
+class ModelInventoryRow:
+    role: str
+    display_name: str
+    source: str
+    model_id: str
+    backend: str
+    required: bool
+    configured: bool
+    requires_huggingface_token: bool
+    requires_access_approval: bool
+    unit_type: str | None = None
+    url: str | None = None
+    notes: list[str] | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
 
 
 def build_model_inventory(
@@ -30,8 +58,11 @@ def build_model_inventory(
     ffmpeg_bin: str = "ffmpeg",
     ocr_mode: str = "auto",
     settings: dict[str, Any] | None = None,
+    include_remote: bool = False,
 ) -> dict[str, Any]:
     generated_at = utc_now_iso()
+    settings_payload = settings or {}
+    compute_mode = normalize_compute_mode(settings_payload.get("computeMode"))
     ffprobe_status = ffprobe_version(ffprobe_bin)
     ffmpeg_status = ffmpeg_version(ffmpeg_bin)
     ocr_status = ocr_runtime_status(ocr_mode)
@@ -115,13 +146,33 @@ def build_model_inventory(
             required=audio_model_required,
         ),
     ]
+    model_rows = [row.to_dict() for row in configured_model_rows()]
+    if include_remote:
+        token = load_huggingface_token(settings)
+        for row in model_rows:
+            if row.get("source") != "huggingface":
+                continue
+            row["huggingface"] = fetch_huggingface_model_metadata(
+                str(row.get("model_id") or ""),
+                token=token,
+            )
+
     required_components = [component for component in components if component["execution"]["required"]]
     audio_model_components = [component for component in components if component["execution"]["kind"] == "audio_model"]
     return {
+        "schema_version": 1,
         "schemaVersion": MODEL_INVENTORY_SCHEMA_VERSION,
         "product": PRODUCT_NAME,
         "version": __version__,
+        "generated_at": generated_at,
         "generatedAt": generated_at,
+        "pipeline": {
+            "name": PRODUCT_NAME,
+            "pipeline_version": PIPELINE_VERSION,
+            "compute_mode": compute_mode,
+            "generation_signature": build_generation_signature(compute_mode=compute_mode),
+        },
+        "models": model_rows,
         "ok": all(component["runtime"]["ready"] for component in required_components),
         "sourceVideoSafety": {
             "sourceVideoModified": False,
@@ -138,6 +189,186 @@ def build_model_inventory(
         },
         "components": components,
     }
+
+
+def build_generation_signature(*, compute_mode: str) -> str:
+    payload = {
+        "pipeline": PRODUCT_NAME,
+        "pipeline_version": PIPELINE_VERSION,
+        "compute_mode": normalize_compute_mode(compute_mode),
+        "frame_ocr": {
+            "backend": "pytesseract",
+            "model_id": OCR_MODEL_ID,
+        },
+        "visual_features": {
+            "backend": "Pillow",
+        },
+        "phone_recognition": {
+            "backend": ACOUSTIC_UNIT_BACKEND,
+            "model_id": ACOUSTIC_UNIT_MODEL_ID,
+            "unit_type": ACOUSTIC_UNIT_TYPE,
+        },
+        "diarization": {
+            "required": True,
+            "model_id": DIARIZATION_MODEL_ID,
+        },
+        "vad": {
+            "backend": SILENCE_DETECT_BACKEND,
+            "model_id": SILENCE_DETECT_MODEL_ID,
+        },
+        "artifact": {
+            "schema": "timeline_for_video.video_record.v1",
+            "path": "video_record.json",
+        },
+    }
+    canonical = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def configured_model_rows() -> list[ModelInventoryRow]:
+    return [
+        ModelInventoryRow(
+            role="speaker_diarization",
+            display_name="Speaker diarization",
+            source="huggingface",
+            model_id=DIARIZATION_MODEL_ID,
+            backend=DIARIZATION_BACKEND,
+            required=True,
+            configured=True,
+            requires_huggingface_token=True,
+            requires_access_approval=True,
+            url=HUGGING_FACE_MODEL_URL.format(model_id=DIARIZATION_MODEL_ID),
+            notes=[
+                "Used to assign mechanical speaker labels such as SPEAKER_00.",
+                "Access approval on Hugging Face is required before processing.",
+            ],
+        ),
+        ModelInventoryRow(
+            role="acoustic_unit_extraction",
+            display_name="Acoustic unit extraction",
+            source="huggingface",
+            model_id=ACOUSTIC_UNIT_MODEL_ID,
+            backend=ACOUSTIC_UNIT_BACKEND,
+            required=True,
+            configured=True,
+            requires_huggingface_token=False,
+            requires_access_approval=False,
+            unit_type=ACOUSTIC_UNIT_TYPE,
+            url=HUGGING_FACE_MODEL_URL.format(model_id=ACOUSTIC_UNIT_MODEL_ID),
+            notes=[
+                "Used to extract phone-like tokens.",
+                "TimelineForVideo stores this as phone_tokens, not readable text.",
+            ],
+        ),
+        ModelInventoryRow(
+            role="frame_ocr",
+            display_name="Frame OCR",
+            source="local_tool",
+            model_id=OCR_MODEL_ID,
+            backend="pytesseract",
+            required=True,
+            configured=True,
+            requires_huggingface_token=False,
+            requires_access_approval=False,
+            notes=[
+                "Runs local OCR over generated frame artifacts.",
+                "This follows the TimelineForImage-compatible frame OCR path.",
+            ],
+        ),
+        ModelInventoryRow(
+            role="speech_candidate_detection",
+            display_name="Speech candidate detection",
+            source="local_tool",
+            model_id=SILENCE_DETECT_MODEL_ID,
+            backend=SILENCE_DETECT_BACKEND,
+            required=True,
+            configured=True,
+            requires_huggingface_token=False,
+            requires_access_approval=False,
+            notes=[
+                "This is an ffmpeg silencedetect configuration, not a Hugging Face model.",
+            ],
+        ),
+    ]
+
+
+def fetch_huggingface_model_metadata(
+    model_id: str,
+    *,
+    token: str | None = None,
+    timeout_seconds: int = 10,
+) -> dict[str, Any]:
+    if not model_id:
+        return {
+            "remote_status": "skipped",
+            "error": "model_id is empty.",
+        }
+    request = urllib.request.Request(
+        HUGGING_FACE_MODEL_API_URL.format(model_id=model_id),
+        headers=huggingface_headers(token),
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        return {
+            "remote_status": "error",
+            "http_status": exc.code,
+            "error": f"Hugging Face returned HTTP {exc.code}.",
+        }
+    except Exception as exc:
+        return {
+            "remote_status": "error",
+            "error": str(exc),
+        }
+    if not isinstance(payload, dict):
+        return {
+            "remote_status": "error",
+            "error": "Hugging Face response was not a JSON object.",
+        }
+    return summarize_huggingface_model_payload(payload)
+
+
+def huggingface_headers(token: str | None) -> dict[str, str]:
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": "TimelineForVideo/1.0",
+    }
+    value = str(token or "").strip()
+    if value:
+        headers["Authorization"] = f"Bearer {value}"
+    return headers
+
+
+def summarize_huggingface_model_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    card_data = payload.get("cardData") if isinstance(payload.get("cardData"), dict) else {}
+    tags = payload.get("tags") if isinstance(payload.get("tags"), list) else []
+    license_value = card_data.get("license") or license_from_tags(tags)
+    return {
+        "remote_status": "ok",
+        "id": payload.get("id"),
+        "sha": payload.get("sha"),
+        "last_modified": payload.get("lastModified"),
+        "private": payload.get("private"),
+        "gated": payload.get("gated"),
+        "disabled": payload.get("disabled"),
+        "pipeline_tag": payload.get("pipeline_tag"),
+        "library_name": payload.get("library_name") or card_data.get("library_name"),
+        "license": license_value,
+        "license_source": "cardData.license" if card_data.get("license") else "tags",
+        "tags": tags,
+        "downloads": payload.get("downloads"),
+        "likes": payload.get("likes"),
+        "model_card_url": HUGGING_FACE_MODEL_URL.format(model_id=str(payload.get("id") or "")),
+    }
+
+
+def license_from_tags(tags: list[Any]) -> str | None:
+    for tag in tags:
+        text = str(tag or "")
+        if text.startswith("license:"):
+            return text.split(":", 1)[1] or None
+    return None
 
 
 def visual_feature_runtime_status() -> dict[str, Any]:
@@ -210,7 +441,7 @@ def audio_model_component(
             "required": required,
             "implementedInVideoWorker": True,
             "sourceSharing": False,
-            "status": "required_by_current_settings" if required else "runs_when_dependencies_and_token_are_available",
+            "status": "required" if required else "runs_when_dependencies_and_token_are_available",
         },
         "runtime": {
             "ready": bool(ready),

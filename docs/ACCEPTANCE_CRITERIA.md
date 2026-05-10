@@ -5,7 +5,10 @@
 - `settings init/status/save` work.
 - `health` works.
 - `doctor` checks runtime and configured paths.
-- `models list` reports local processing components and pyannote/ZIPA readiness.
+- `models list` reports Audio-compatible model rows, pipeline generation
+  signature, Video runtime components, and pyannote/ZIPA readiness.
+- `models list --include-remote --json` attaches Hugging Face metadata to
+  Hugging Face model rows.
 - `files list` discovers video files from file and directory inputs.
 - `sample frames --max-items 1` extracts bounded frame evidence.
 - `ocr frames --max-items 1` writes local frame OCR evidence.

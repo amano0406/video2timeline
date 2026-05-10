@@ -380,8 +380,15 @@ class CliTests(unittest.TestCase):
                 env,
             )
 
-            self.assertEqual(exit_code, 1)
+            self.assertEqual(exit_code, 0)
             self.assertFalse(payload["ok"])
+            self.assertEqual(payload["pipeline"]["name"], "TimelineForVideo")
+            self.assertEqual(len(payload["pipeline"]["generation_signature"]), 64)
+            model_rows = {row["role"]: row for row in payload["models"]}
+            self.assertEqual(model_rows["speaker_diarization"]["model_id"], "pyannote/speaker-diarization-community-1")
+            self.assertEqual(model_rows["acoustic_unit_extraction"]["model_id"], "anyspeech/zipa-large-crctc-300k")
+            self.assertEqual(model_rows["frame_ocr"]["model_id"], "tesseract:jpn+eng")
+            self.assertEqual(model_rows["speech_candidate_detection"]["model_id"], "ffmpeg-silencedetect-noise-35db")
             self.assertEqual(payload["counts"]["requiredComponents"], 8)
             self.assertEqual(payload["counts"]["audioModelComponents"], 2)
             components = {component["id"]: component for component in payload["components"]}

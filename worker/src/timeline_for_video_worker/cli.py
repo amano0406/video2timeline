@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import platform
+from pathlib import Path
 import time
 from typing import Any
 
@@ -278,9 +279,16 @@ def build_parser() -> argparse.ArgumentParser:
     models_subparsers = models_parser.add_subparsers(dest="models_command", required=True)
 
     models_list_parser = models_subparsers.add_parser("list", help="List processing components.")
+    models_list_parser.add_argument(
+        "--include-remote",
+        "--remote",
+        action="store_true",
+        help="Fetch Hugging Face metadata such as license and gated status.",
+    )
     models_list_parser.add_argument("--ffprobe-bin", default="ffprobe", help="ffprobe command path.")
     models_list_parser.add_argument("--ffmpeg-bin", default="ffmpeg", help="ffmpeg command path.")
     models_list_parser.add_argument("--ocr-mode", choices=OCR_MODES, default="auto", help="OCR mode to check.")
+    models_list_parser.add_argument("--output", type=Path, required=False, help="Write JSON payload to this path.")
     models_list_parser.add_argument("--json", action="store_true", help="Emit JSON output.")
     models_list_parser.set_defaults(handler=handle_models_list)
 
@@ -910,10 +918,30 @@ def handle_models_list(args: argparse.Namespace) -> int:
         ffmpeg_bin=args.ffmpeg_bin,
         ocr_mode=args.ocr_mode,
         settings=settings,
+        include_remote=args.include_remote,
     )
+    if args.output:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     if args.json:
         emit_json(payload)
     else:
+        print(f"pipeline_version: {payload['pipeline']['pipeline_version']}")
+        print(f"compute_mode: {payload['pipeline']['compute_mode']}")
+        print(f"generation_signature: {payload['pipeline']['generation_signature']}")
+        for row in payload["models"]:
+            print(
+                f"{row['role']}: {row['model_id']} | "
+                f"{row['source']} | {row['backend']} | required={row['required']}"
+            )
+            if row.get("url"):
+                print(f"  url: {row['url']}")
+            remote = row.get("huggingface")
+            if isinstance(remote, dict):
+                license_value = remote.get("license") or "unknown"
+                gated = remote.get("gated")
+                print(f"  hf: status={remote.get('remote_status')} license={license_value} gated={gated}")
+        print("")
         print(f"Processing components: {'OK' if payload['ok'] else 'ISSUES FOUND'}")
         print(
             "Required components: "
@@ -931,7 +959,7 @@ def handle_models_list(args: argparse.Namespace) -> int:
             print(f"        {component['role']}")
             if component["execution"]["kind"] == "audio_model":
                 print("        status: runs when dependencies and Hugging Face token are available")
-    return 0 if payload["ok"] else 1
+    return 0
 
 
 def handle_items_refresh(args: argparse.Namespace) -> int:

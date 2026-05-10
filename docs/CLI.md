@@ -24,12 +24,15 @@ Run commands from Windows PowerShell in `C:\apps\TimelineForVideo`.
 .\cli.ps1 health
 .\cli.ps1 doctor
 .\cli.ps1 models list
+.\cli.ps1 models list --include-remote --json
 .\cli.ps1 files list
 ```
 
-`models list` reports local processing components, pyannote/ZIPA dependency
-readiness, and token status. It is a visibility command; it does not process
-source videos.
+`models list` reports an Audio-compatible `models` array and
+`pipeline.generation_signature` for parent-product license/access display,
+plus Video runtime `components` for readiness checks.
+Use `--include-remote` to fetch Hugging Face metadata such as license and gated
+status. It is a visibility command; it does not process source videos.
 
 ## Probe And Sampling
 

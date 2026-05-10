@@ -21,8 +21,11 @@ fingerprint, and item id from path/stat metadata.
 
 ## 4. Inspect Components
 
-`models list` reports local processing components, pyannote/ZIPA dependency
-readiness, and token status. It does not process source videos.
+`models list` reports an Audio-compatible `models` array and
+`pipeline.generation_signature` for model license/access review, plus a Video
+`components` array for runtime readiness.
+`models list --include-remote --json` fetches Hugging Face metadata. It does
+not process source videos.
 
 ## 5. Sample
 

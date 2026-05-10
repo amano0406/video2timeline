@@ -24,6 +24,7 @@ cd C:\apps\TimelineForVideo
 .\cli.ps1 settings save --input-root C:\Users\amano\Videos --input-root F:\Video --output-root C:\TimelineData\video
 .\cli.ps1 doctor
 .\cli.ps1 models list
+.\cli.ps1 models list --include-remote --json
 .\cli.ps1 files list
 .\cli.ps1 files list --page 1 --page-size 100 --json
 .\cli.ps1 probe list --max-items 1
@@ -146,15 +147,18 @@ The resident worker defaults to one changed item per refresh cycle through
 `TIMELINE_FOR_VIDEO_WORKER_MAX_ITEMS=1`. Override that environment variable
 when intentionally processing a larger batch.
 
-`models list` reports the local processing components and the TimelineForAudio
-compatible audio-model components. Frame OCR is executed locally with
-Tesseract. Audio derivative and speech-candidate detection are executed locally
-with ffmpeg. The generated MP3 is a review artifact only; pyannote diarization
-and ZIPA acoustic-unit extraction read a temporary normalized WAV so the audio
-model path matches TimelineForAudio's preprocessing contract. Audio model
-execution is required by default and fails the item instead of inventing speaker
-turns or phone tokens. Diagnostic commands may still override execution mode
-for isolated troubleshooting, but that mode is not stored in settings.
+`models list` reports an Audio-compatible `models` array and
+`pipeline.generation_signature` for parent-product license/access display, plus
+a Video `components` array for runtime readiness.
+`--include-remote` fetches Hugging Face metadata such as license and gated
+status. Frame OCR is executed locally with Tesseract. Audio derivative and
+speech-candidate detection are executed locally with ffmpeg. The generated MP3
+is a review artifact only; pyannote diarization and ZIPA acoustic-unit
+extraction read a temporary normalized WAV so the audio model path matches
+TimelineForAudio's preprocessing contract. Audio model execution is required by
+default and fails the item instead of inventing speaker turns or phone tokens.
+Diagnostic commands may still override execution mode for isolated
+troubleshooting, but that mode is not stored in settings.
 
 Milestone 6 export and removal commands are source-safe:
 

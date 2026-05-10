@@ -98,7 +98,12 @@ or provided through `TIMELINE_FOR_VIDEO_HUGGING_FACE_TOKEN`,
 
 ## Current Components
 
-`models list` reports the current execution inventory.
+`models list` reports the current execution inventory. Its top-level `models`
+array and `pipeline.generation_signature` follow TimelineForAudio's model
+inventory shape for parent-product license/access display. The top-level
+`components` array keeps Video-specific runtime readiness details. `models list
+--include-remote --json` fetches Hugging Face metadata such as license, gated
+status, and model-card URL.
 
 | Component | Current model / backend | Execution |
 |---|---|---|

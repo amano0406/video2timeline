@@ -63,11 +63,22 @@ class ModelInventoryTests(unittest.TestCase):
                     ):
                         payload = build_model_inventory(settings={})
 
+        self.assertEqual(payload["schema_version"], 1)
+        self.assertEqual(payload["pipeline"]["name"], "TimelineForVideo")
+        self.assertEqual(len(payload["pipeline"]["generation_signature"]), 64)
         self.assertFalse(payload["ok"])
         self.assertEqual(payload["counts"]["requiredComponents"], 8)
         self.assertEqual(payload["counts"]["readyRequiredComponents"], 7)
         self.assertEqual(payload["counts"]["audioModelComponents"], 2)
         self.assertEqual(payload["counts"]["readyAudioModelComponents"], 1)
+        rows = {row["role"]: row for row in payload["models"]}
+        self.assertEqual(rows["speaker_diarization"]["model_id"], "pyannote/speaker-diarization-community-1")
+        self.assertTrue(rows["speaker_diarization"]["requires_huggingface_token"])
+        self.assertTrue(rows["speaker_diarization"]["requires_access_approval"])
+        self.assertEqual(rows["acoustic_unit_extraction"]["model_id"], "anyspeech/zipa-large-crctc-300k")
+        self.assertEqual(rows["acoustic_unit_extraction"]["unit_type"], "phone_like")
+        self.assertEqual(rows["speech_candidate_detection"]["model_id"], "ffmpeg-silencedetect-noise-35db")
+        self.assertEqual(rows["frame_ocr"]["model_id"], "tesseract:jpn+eng")
         self.assertFalse(payload["sourceVideoSafety"]["sourceVideoModified"])
         self.assertFalse(payload["sourceVideoSafety"]["sourceVideosIncludedInZip"])
         self.assertFalse(payload["sourceVideoSafety"]["generatedAudioIncludedInZip"])
@@ -108,6 +119,41 @@ class ModelInventoryTests(unittest.TestCase):
         self.assertFalse(components["bounded_frame_sampling"]["runtime"]["ready"])
         self.assertFalse(components["audio_derivative"]["runtime"]["ready"])
         self.assertFalse(components["speech_candidate_detection"]["runtime"]["ready"])
+
+    def test_inventory_can_include_remote_huggingface_metadata(self) -> None:
+        remote = {
+            "remote_status": "ok",
+            "license": "cc-by-4.0",
+            "gated": "auto",
+        }
+        with patch("timeline_for_video_worker.model_inventory.ffprobe_version", return_value=ok_runtime("ffprobe")):
+            with patch("timeline_for_video_worker.model_inventory.ffmpeg_version", return_value=ok_runtime("ffmpeg")):
+                with patch(
+                    "timeline_for_video_worker.model_inventory.ocr_runtime_status",
+                    return_value={
+                        "ok": True,
+                        "mode": "auto",
+                        "model": "tesseract:jpn+eng",
+                        "languages": ["eng", "jpn"],
+                        "message": "ready",
+                    },
+                ):
+                    with patch(
+                        "timeline_for_video_worker.model_inventory.audio_model_runtime_status",
+                        return_value=audio_status(token_configured=True),
+                    ):
+                        with patch(
+                            "timeline_for_video_worker.model_inventory.fetch_huggingface_model_metadata",
+                            return_value=remote,
+                        ) as fetch:
+                            payload = build_model_inventory(settings={}, include_remote=True)
+
+        rows = {row["role"]: row for row in payload["models"]}
+        self.assertEqual(rows["speaker_diarization"]["huggingface"], remote)
+        self.assertEqual(rows["acoustic_unit_extraction"]["huggingface"], remote)
+        self.assertNotIn("huggingface", rows["speech_candidate_detection"])
+        self.assertNotIn("huggingface", rows["frame_ocr"])
+        self.assertEqual(fetch.call_count, 2)
 
 
 if __name__ == "__main__":
