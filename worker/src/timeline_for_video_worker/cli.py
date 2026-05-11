@@ -794,7 +794,7 @@ def handle_audio_analyze(args: argparse.Namespace) -> int:
         print(f"Audio artifacts: {result['counts']['audioArtifacts']}")
         print(f"Speech candidates: {result['counts']['speechCandidates']}")
         print(f"Diarization turns: {result['counts']['diarizationTurns']}")
-        print(f"Acoustic-unit turns: {result['counts']['acousticUnitTurns']}")
+        print(f"Transcript segments: {result['counts']['transcriptionSegments']}")
         print("")
         for record in result["records"]:
             status = "OK" if record["ok"] else "FAIL"
@@ -807,7 +807,7 @@ def handle_audio_analyze(args: argparse.Namespace) -> int:
             print(
                 f"        audio_models: {record['audioModels']['mode']} "
                 f"diarization={record['diarization']['status']} "
-                f"acoustic_units={record['acousticUnits']['status']}"
+                f"transcription={record['transcription']['status']}"
             )
             for warning in record["warnings"]:
                 print(f"        warning: {warning}")

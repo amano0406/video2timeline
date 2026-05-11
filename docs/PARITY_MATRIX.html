@@ -297,7 +297,7 @@
           <tr>
             <td class="category">Audio</td>
             <td>モデル・依存の棚卸し</td>
-            <td><code>models list</code> で pyannote、ZIPA、FFmpeg、GPU条件を確認できる。</td>
+            <td><code>models list</code> で pyannote、faster-whisper、FFmpeg、GPU条件を確認できる。</td>
             <td>Videoの <code>models list --json</code> はAudio互換の <code>models</code> 配列、<code>pipeline.generation_signature</code>、Video固有の <code>components</code> 配列を返す。<code>--include-remote</code> でHugging Faceのlicense/gated情報も取得できる。</td>
             <td class="status ok">○</td>
             <td><code>model_inventory.py</code>, Docker実行結果</td>
@@ -316,7 +316,7 @@
             <td class="category">Audio</td>
             <td>モデル入力前処理</td>
             <td>Audioは <code>ffmpeg</code> で正規化WAVを作り、モデル処理は正規化WAVを読む。正規化WAVは処理中間物でmaster artifactにしない。</td>
-            <td>Videoはレビュー用MP3とは別に一時正規化WAVを作り、pyannote/ZIPAはそのWAVを読む。WAVは処理後に削除され、master artifactに残さない。</td>
+            <td>Videoはレビュー用MP3とは別に一時正規化WAVを作り、pyannote/faster-whisperはそのWAVを読む。WAVは処理後に削除され、master artifactに残さない。</td>
             <td class="status ok">○</td>
             <td>Audio <code>processor.py</code> / Video <code>audio_analysis.py</code></td>
             <td>なし。</td>
@@ -343,46 +343,46 @@
             <td class="category">Audio</td>
             <td>diarization必須性と失敗契約</td>
             <td>Audioではdiarizationは必須。失敗時にfallback speakerを捏造しない。</td>
-            <td>Videoの既定は <code>required</code>。pyannote/ZIPAが実行できない場合はmaster完成扱いにせず、fallback speakerやphone tokenを作らない。</td>
+            <td>Videoの既定は <code>required</code>。pyannote/faster-whisperが実行できない場合はmaster完成扱いにせず、fallback speakerやtranscript textを作らない。</td>
             <td class="status ok">○</td>
             <td>Audio <code>docs/PIPELINE.md</code> / Video <code>audio_models.py</code></td>
             <td>なし。</td>
           </tr>
           <tr>
             <td class="category">Audio</td>
-            <td>ZIPA acoustic units</td>
-            <td><code>anyspeech/zipa-large-crctc-300k</code> をONNX Runtimeで実行し、公開フィールドは <code>phone_tokens</code>。</td>
-            <td>Videoも同じモデルIDと <code>phone_tokens</code> を使い、readable transcriptは作らない。</td>
+            <td>Whisper transcript</td>
+            <td><code>Systran/faster-whisper-large-v3</code> で読みやすい文字起こしを作る。</td>
+            <td>Videoは <code>faster_whisper_large_v3</code> を使い、<code>text</code> として保存する。</td>
             <td class="status ok">○</td>
             <td><code>audio_models.py</code>, <code>items.py</code></td>
             <td>なし。</td>
           </tr>
           <tr>
             <td class="category">Audio</td>
-            <td>長尺音声のchunk処理とspeaker割当</td>
-            <td>Audioは候補区間を小さく処理し、speaker turnとtimestamp overlapで統合する。</td>
-            <td>Videoは候補区間を最大30秒chunkに分け、正規化WAVからchunk単位で読み出してZIPAへ渡し、speaker interval overlapでspeakerを付ける。</td>
+            <td>Whisper textとspeaker割当</td>
+            <td>speaker turnとtimestamp overlapで発話者を推定する。</td>
+            <td>VideoはWhisper segmentの本文を変更せず、pyannoteのspeaker interval overlapでspeakerだけを付ける。</td>
             <td class="status ok">○</td>
-            <td><code>MAX_ACOUSTIC_CHUNK_SECONDS</code>, <code>speaker_for_interval</code></td>
+            <td><code>run_whisper_transcription</code>, <code>speaker_assignment_for_interval</code></td>
             <td>なし。</td>
           </tr>
           <tr>
             <td class="category">Audio</td>
             <td>GPU fail-fast</td>
-            <td>Audio GPUはCUDA/ONNX CUDA providerがなければCPUへ黙ってfallbackしない。</td>
-            <td>Videoも <code>computeMode: gpu</code> が既定。GPU worker、PyTorch CUDA、<code>CUDAExecutionProvider</code> が揃わなければ失敗し、CPUへ黙ってfallbackしない。</td>
+            <td>Audio GPUはCUDAがなければCPUへ黙ってfallbackしない。</td>
+            <td>Videoも <code>computeMode: gpu</code> が既定。GPU worker、PyTorch CUDA、CTranslate2 CUDAが揃わなければ失敗し、CPUへ黙ってfallbackしない。</td>
             <td class="status ok">○</td>
-            <td><code>docker-compose.gpu.yml</code>, <code>onnx_providers</code></td>
+            <td><code>docker-compose.gpu.yml</code>, <code>compute_runtime_status</code></td>
             <td>なし。</td>
           </tr>
           <tr>
             <td class="category">Audio</td>
-            <td>フル文字起こし非対応</td>
-            <td>Audioは読みやすい文章ではなく、phone-like acoustic unitsを保存する。</td>
-            <td>Videoも <code>readableText</code> は空で、音声テキスト証跡は <code>phone_tokens</code> に限定している。</td>
+            <td>Whisper本文の保持</td>
+            <td>文字起こし本文を話者分離で劣化させない。</td>
+            <td>VideoはWhisperが出した <code>text</code> を正とし、話者分離の突き合わせで削除・短縮・再構成しない。</td>
             <td class="status ok">○</td>
             <td><code>audio_analysis.py</code>, Audio <code>docs/PIPELINE.md</code></td>
-            <td>READMEで「音声は文字起こしではなくphone_tokens」と明記する。</td>
+            <td>なし。</td>
           </tr>
           <tr>
             <td class="category">Audio</td>
@@ -469,7 +469,7 @@
             <td class="category">Safety</td>
             <td>外部API / 人物認識 / 顔認識</td>
             <td>Imageは外部画像APIを呼ばず、人物認識もしない。Audioはモデル実行以外の外部解析APIを前提にしない。</td>
-            <td>VideoもOCR、pyannote、ZIPA以外のscene detection、OCR外API、人物/顔認識、外部解析APIを実装していない。</td>
+            <td>VideoもOCR、pyannote、faster-whisper以外のscene detection、OCR外API、人物/顔認識、外部解析APIを実装していない。</td>
             <td class="status ok">○</td>
             <td><code>model_inventory.py</code>, docs</td>
             <td>なし。</td>
@@ -526,10 +526,10 @@
     <section class="panel">
       <h2>完了した一致化</h2>
       <ul class="todo-list">
-        <li><strong>Audio:</strong> 一時正規化WAVをモデル入力にし、レビュー用MP3をpyannote/ZIPA入力から外した。</li>
+        <li><strong>Audio:</strong> 一時正規化WAVをモデル入力にし、レビュー用MP3をpyannote/faster-whisper入力から外した。</li>
         <li><strong>Audio:</strong> speech candidate検出を正規化WAV起点にした。</li>
-        <li><strong>Audio:</strong> ZIPAは候補区間を最大30秒chunkとしてWAVから読み出す。</li>
-        <li><strong>Audio:</strong> pyannote/ZIPAの既定動作を必須にした。</li>
+        <li><strong>Audio:</strong> Whisper本文を保持し、speaker labelだけをpyannoteのoverlapで付与するようにした。</li>
+        <li><strong>Audio:</strong> pyannote/faster-whisperの既定動作を必須にした。</li>
         <li><strong>GPU:</strong> <code>computeMode</code> の既定を <code>gpu</code> にし、Audio互換モデルはCPUへ黙ってfallbackしないようにした。</li>
         <li><strong>CLI:</strong> <code>files list</code>, <code>items list</code>, <code>runs list</code> にページングを追加した。</li>
         <li><strong>Image:</strong> palette量子化を <code>Image.Quantize.MEDIANCUT</code> に揃えた。</li>

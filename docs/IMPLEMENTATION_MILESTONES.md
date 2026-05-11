@@ -70,8 +70,8 @@
 
 - frame OCR over generated frame artifacts, following TimelineForImage behavior
   without source sharing
-- audio derivative, speech candidate evidence, pyannote diarization, and ZIPA
-  acoustic-unit execution paths, following TimelineForAudio behavior without
+- audio derivative, speech candidate evidence, pyannote diarization, and
+  faster-whisper transcription execution paths, following TimelineForAudio behavior without
   source sharing
 - `ocr frames`
 - `audio analyze`

@@ -50,8 +50,8 @@ Sampling is bounded. It does not extract every frame.
 
 `ocr frames` runs local OCR over generated frame sample artifacts. `audio
 analyze` writes source-safe generated audio evidence under `outputRoot`.
-`audio analyze` requires the pyannote/ZIPA path by default and fails instead of
-creating fallback speakers or phone tokens. Diagnostic commands may still use
+`audio analyze` requires the pyannote/faster-whisper path by default and fails
+instead of creating fallback speakers or transcript text. Diagnostic commands may still use
 `--audio-model-mode auto` or `--audio-model-mode off` for isolated
 troubleshooting, but this is not saved in settings. Model execution uses a
 temporary normalized WAV, not the review MP3 artifact. `computeMode: "gpu"` is

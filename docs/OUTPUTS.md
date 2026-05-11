@@ -38,7 +38,7 @@ All generated files are written under `outputRoot`.
 - `raw_outputs/ffprobe.json`: ffprobe probe record including raw ffprobe JSON.
 - `raw_outputs/frame_samples.json`: bounded sampling record.
 - `raw_outputs/frame_ocr.json`: local OCR results and frame visual features for generated frame samples, using Image-compatible OCR fields such as `has_text`, `full_text`, `block_id`, and `bbox_norm`.
-- `raw_outputs/audio_analysis.json`: generated audio derivative, temporary normalized-WAV model input metadata, speech candidate evidence, speech-scoped pyannote diarization status, and ZIPA acoustic-unit status. Acoustic-unit turns use `phone_tokens`.
+- `raw_outputs/audio_analysis.json`: generated audio derivative, temporary normalized-WAV model input metadata, speech candidate evidence, pyannote diarization status, and faster-whisper transcription status. Transcript segments preserve Whisper text and add speaker labels by diarization overlap.
 - `raw_outputs/activity_map.json`: source-safe activity map combining merged audio speech candidates and five-minute visual sentinel deltas. Inactive intervals are evidence that detailed analysis can be skipped because the audio is silent and the sampled visual signal is static.
 - `artifacts/contact_sheet.jpg`: generated review contact sheet.
 - `artifacts/frames/`: generated frame samples.

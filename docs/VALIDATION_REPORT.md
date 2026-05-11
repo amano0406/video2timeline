@@ -38,7 +38,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "<parse cli.ps1/start
   compute mode, and source-safety flags.
 - Token redaction tests: passed for environment-token precedence and redacted
   JSON status.
-- Docker model inventory: passed, including local components, pyannote/ZIPA
+- Docker model inventory: passed, including local components, pyannote/faster-whisper
   dependencies, and redacted token status.
 - Docker doctor: passed, including ffmpeg/ffprobe, Tesseract `jpn+eng`, and
   audio-model dependency/token status.
@@ -72,7 +72,7 @@ The smoke test confirmed:
 - `convert_info.json` included both `ffprobeVersion` and `ffmpegVersion`.
 - `items list` reported OCR and audio-evidence counts.
 - Diagnostic `--audio-model-mode auto` recorded `not_configured` without
-  inventing speaker turns or phone tokens when no Hugging Face token was
+  inventing speaker turns or transcript text when no Hugging Face token was
   configured.
 - Default required audio-model execution returned a structured failure when no
   Hugging Face token was configured.

@@ -84,13 +84,12 @@ ZIP exports.
 
 Audio model execution decodes the source-video audio into a temporary
 normalized WAV, runs speech candidate detection on that WAV, and then runs the
-TimelineForAudio-compatible pyannote/ZIPA model path on the same WAV. The
-temporary WAV is removed after the item is processed and is not a master
-artifact.
-Audio model execution is required by default; the item fails when pyannote/ZIPA
-cannot run. Diagnostic commands can still pass `--audio-model-mode auto` or
-`--audio-model-mode off` for isolated troubleshooting, but that mode is not a
-settings field and is not persisted.
+pyannote/faster-whisper model path on the same WAV. The temporary WAV is
+removed after the item is processed and is not a master artifact.
+Audio model execution is required by default; the item fails when pyannote or
+faster-whisper cannot run. Diagnostic commands can still pass
+`--audio-model-mode auto` or `--audio-model-mode off` for isolated
+troubleshooting, but that mode is not a settings field and is not persisted.
 
 The token can be stored in local `settings.json` with `settings save --token`
 or provided through `TIMELINE_FOR_VIDEO_HUGGING_FACE_TOKEN`,
@@ -115,12 +114,12 @@ status, and model-card URL.
 | Audio model input | `ffmpeg` normalized WAV extraction | temporary local processing file, removed after processing |
 | Speech candidate detection | `ffmpeg` silencedetect | local evidence over normalized WAV |
 | Speaker diarization | `pyannote/speaker-diarization-community-1` | GPU by default when `computeMode` is `gpu`; fail-fast if CUDA is unavailable |
-| Acoustic units | `anyspeech/zipa-large-crctc-300k` | ONNX `CUDAExecutionProvider` by default when `computeMode` is `gpu`; fail-fast if unavailable |
+| Speech transcription | `Systran/faster-whisper-large-v3` | GPU by default when `computeMode` is `gpu`; fail-fast if CUDA is unavailable |
 
 The Video worker does not import or share TimelineForAudio/Image code. It also
-does not silently invent diarization turns or phone-token output when the audio
+does not silently invent diarization turns or transcript text when the audio
 models cannot run.
 
 Generated frame OCR subpayloads use the same field names as TimelineForImage.
-Generated acoustic-unit turns use TimelineForAudio's public `phone_tokens`
-field name.
+Generated audio transcript segments use Whisper text. Speaker labels are
+attached from diarization by time overlap without modifying the Whisper text.

@@ -16,16 +16,16 @@ upstream license files and model cards before redistributing a built image.
 | torch | `2.8.0+cpu` | audio model runtime |
 | torchaudio | `2.8.0+cpu` | audio loading and resampling |
 | pyannote.audio | `4.0.1` | speaker diarization runtime |
-| onnxruntime | `1.23.2` | ZIPA acoustic-unit ONNX inference |
-| lhotse | `1.32.0` | acoustic feature extraction |
 | huggingface_hub | `0.36.0` | model download |
+| faster-whisper | `>=1.1,<2` | readable speech transcription |
+| ctranslate2 | `>=4.5,<5` | faster-whisper runtime |
 
 ## Model Dependencies
 
 | Model | Role | Notes |
 |---|---|---|
 | `pyannote/speaker-diarization-community-1` | speaker diarization | Requires Hugging Face token and upstream access approval. Verify the model card and license before redistribution. |
-| `anyspeech/zipa-large-crctc-300k` | phone-like acoustic-unit extraction | Verify the upstream model card and license before redistribution. |
+| `Systran/faster-whisper-large-v3` | speech transcription | Verify the upstream model card and license before redistribution. |
 
 ## Product Boundaries
 

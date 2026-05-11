@@ -14,11 +14,11 @@ from .audio_analysis import (
     SILENCE_DETECT_MODEL_ID,
 )
 from .audio_models import (
-    ACOUSTIC_UNIT_BACKEND,
-    ACOUSTIC_UNIT_MODEL_ID,
-    ACOUSTIC_UNIT_TYPE,
     DIARIZATION_BACKEND,
     DIARIZATION_MODEL_ID,
+    TRANSCRIPTION_BACKEND,
+    TRANSCRIPTION_MODEL_ALIAS,
+    TRANSCRIPTION_MODEL_ID,
     audio_model_runtime_status,
     normalize_compute_mode,
 )
@@ -45,7 +45,6 @@ class ModelInventoryRow:
     configured: bool
     requires_huggingface_token: bool
     requires_access_approval: bool
-    unit_type: str | None = None
     url: str | None = None
     notes: list[str] | None = None
 
@@ -135,13 +134,12 @@ def build_model_inventory(
             requires_access_approval=True,
         ),
         audio_model_component(
-            component_id="acoustic_units",
-            display_name="acoustic units",
-            role="Run TimelineForAudio-compatible phone-like acoustic-unit extraction over generated audio.",
-            backend=ACOUSTIC_UNIT_BACKEND,
-            model_id=ACOUSTIC_UNIT_MODEL_ID,
-            unit_type=ACOUSTIC_UNIT_TYPE,
-            ready=audio_model_status["acousticUnits"]["ready"],
+            component_id="speech_transcription",
+            display_name="speech transcription",
+            role="Run Whisper transcription over generated audio without modifying text during speaker assignment.",
+            backend=TRANSCRIPTION_BACKEND,
+            model_id=TRANSCRIPTION_MODEL_ID,
+            ready=audio_model_status["transcription"]["ready"],
             runtime=audio_model_status,
             required=audio_model_required,
         ),
@@ -203,10 +201,11 @@ def build_generation_signature(*, compute_mode: str) -> str:
         "visual_features": {
             "backend": "Pillow",
         },
-        "phone_recognition": {
-            "backend": ACOUSTIC_UNIT_BACKEND,
-            "model_id": ACOUSTIC_UNIT_MODEL_ID,
-            "unit_type": ACOUSTIC_UNIT_TYPE,
+        "transcription": {
+            "backend": TRANSCRIPTION_BACKEND,
+            "model_id": TRANSCRIPTION_MODEL_ID,
+            "model_alias": TRANSCRIPTION_MODEL_ALIAS,
+            "language": "auto",
         },
         "diarization": {
             "required": True,
@@ -244,20 +243,19 @@ def configured_model_rows() -> list[ModelInventoryRow]:
             ],
         ),
         ModelInventoryRow(
-            role="acoustic_unit_extraction",
-            display_name="Acoustic unit extraction",
+            role="speech_transcription",
+            display_name="Speech transcription",
             source="huggingface",
-            model_id=ACOUSTIC_UNIT_MODEL_ID,
-            backend=ACOUSTIC_UNIT_BACKEND,
+            model_id=TRANSCRIPTION_MODEL_ID,
+            backend=TRANSCRIPTION_BACKEND,
             required=True,
             configured=True,
             requires_huggingface_token=False,
             requires_access_approval=False,
-            unit_type=ACOUSTIC_UNIT_TYPE,
-            url=HUGGING_FACE_MODEL_URL.format(model_id=ACOUSTIC_UNIT_MODEL_ID),
+            url=HUGGING_FACE_MODEL_URL.format(model_id=TRANSCRIPTION_MODEL_ID),
             notes=[
-                "Used to extract phone-like tokens.",
-                "TimelineForVideo stores this as phone_tokens, not readable text.",
+                f"Uses {TRANSCRIPTION_MODEL_ALIAS} to create readable transcript segments.",
+                "Speaker labels are assigned from diarization without changing Whisper text.",
             ],
         ),
         ModelInventoryRow(
@@ -422,7 +420,6 @@ def audio_model_component(
     runtime: dict[str, Any],
     required: bool,
     requires_access_approval: bool = False,
-    unit_type: str | None = None,
 ) -> dict[str, Any]:
     details = dict(runtime)
     details["audioModelsReady"] = bool(details.pop("ready", False))
@@ -434,7 +431,6 @@ def audio_model_component(
         "role": role,
         "backend": backend,
         "modelId": model_id,
-        "unitType": unit_type,
         "referenceProduct": "TimelineForAudio",
         "execution": {
             "kind": "audio_model",

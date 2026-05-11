@@ -192,7 +192,7 @@ class AudioAnalysisTests(unittest.TestCase):
             self.assertEqual(payload["speechActivity"]["counts"]["speechCandidates"], 2)
             self.assertEqual(payload["audioModels"]["mode"], "auto")
             self.assertEqual(payload["diarization"]["status"], "not_configured")
-            self.assertEqual(payload["acousticUnits"]["status"], "not_configured")
+            self.assertEqual(payload["transcription"]["status"], "not_configured")
             self.assertTrue(payload["ok"])
 
     def test_required_audio_models_fail_when_video_has_no_audio_stream(self) -> None:

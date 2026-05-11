@@ -135,10 +135,9 @@ rows as before.
 
 `computeMode: "gpu"` is the default. In that mode, `start.ps1` and `cli.ps1`
 layer `docker-compose.gpu.yml` on top of the default compose file. The
-TimelineForAudio-compatible pyannote/ZIPA path must use the GPU worker and
-CUDA/ONNX CUDA provider; it fails instead of silently falling back to CPU.
-Frame OCR and frame visual features follow TimelineForImage and remain local
-CPU processing.
+pyannote and faster-whisper path must use the GPU worker and CUDA-capable
+runtime; it fails instead of silently falling back to CPU. Frame OCR and frame
+visual features follow TimelineForImage and remain local CPU processing.
 
 The default Docker mounts cover the configured video roots on `C:\` and `F:\`
 through `/mnt/c` and `/mnt/f` inside the worker.
@@ -153,10 +152,11 @@ a Video `components` array for runtime readiness.
 `--include-remote` fetches Hugging Face metadata such as license and gated
 status. Frame OCR is executed locally with Tesseract. Audio derivative and
 speech-candidate detection are executed locally with ffmpeg. The generated MP3
-is a review artifact only; pyannote diarization and ZIPA acoustic-unit
-extraction read a temporary normalized WAV so the audio model path matches
-TimelineForAudio's preprocessing contract. Audio model execution is required by
-default and fails the item instead of inventing speaker turns or phone tokens.
+is a review artifact only; pyannote diarization and faster-whisper
+transcription read a temporary normalized WAV. Whisper text is preserved as the
+source transcript, and pyannote is used only to attach speaker labels. Audio
+model execution is required by default and fails the item instead of inventing
+speaker turns or transcript text.
 Diagnostic commands may still override execution mode for isolated
 troubleshooting, but that mode is not stored in settings.
 

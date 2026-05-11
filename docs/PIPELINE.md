@@ -45,11 +45,11 @@ brightness, contrast, dominant colors, and a 3x3 average-color grid.
 
 `audio analyze` extracts a generated MP3 derivative under `outputRoot` for
 review, creates a temporary normalized WAV for model processing, runs ffmpeg
-speech candidate detection on that WAV, and runs TimelineForAudio-compatible
-pyannote diarization and ZIPA phone-like acoustic-unit extraction over the same
-WAV. The model calls are scoped to detected speech candidates where possible, so
-silent spans are not sent through the heavy audio model path. The temporary WAV
-is removed after processing. The source video is not modified or copied.
+speech candidate detection on that WAV, and runs pyannote diarization plus
+faster-whisper transcription over the same WAV. Whisper decides what was said;
+pyannote is used only to attach speaker labels by time overlap, without
+splitting, deleting, or rewriting Whisper text. The temporary WAV is removed
+after processing. The source video is not modified or copied.
 
 ## 8. Refresh Items
 

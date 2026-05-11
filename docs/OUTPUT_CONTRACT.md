@@ -84,18 +84,18 @@ Initial event types:
 - `activity_candidate_interval`
 - `activity_skipped_interval`
 - `frame_ocr_text`
-- `audio_acoustic_units`
+- `audio_transcript_segment`
 
 Frame OCR text evidence uses the same OCR subpayload field names as
 TimelineForImage: `has_text`, `full_text`, `block_id`, and `bbox_norm`.
 Generated frame visual features are attached to frame records and visual lane
 events under `visual`, including `quality`, `color_palette`, and a 3x3 color
 `grid`.
-Audio acoustic-unit text evidence uses the same public token field as
-TimelineForAudio: `phone_tokens`.
-The audio-model input is a temporary normalized WAV. The generated MP3 audio
-derivative is only a review artifact and must not be used as the pyannote/ZIPA
-input.
+Audio transcript evidence uses Whisper `text` segments. pyannote diarization is
+used only to attach speaker labels; it must not split, delete, or rewrite
+Whisper text. The audio-model input is a temporary normalized WAV. The
+generated MP3 audio derivative is only a review artifact and must not be used as
+the pyannote/faster-whisper input.
 
 ## convert_info.json
 

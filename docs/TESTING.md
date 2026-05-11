@@ -36,6 +36,6 @@ For full smoke validation, create a short generated sample video with audio, run
 the source video still exists after remove and the ZIP contains no source video
 or generated MP3 audio derivative.
 
-For live pyannote/ZIPA validation, provide a Hugging Face token through the
+For live pyannote/faster-whisper validation, provide a Hugging Face token through the
 environment and run `audio analyze --audio-model-mode required` on a short
 generated speech video. Do not store the token in committed files.

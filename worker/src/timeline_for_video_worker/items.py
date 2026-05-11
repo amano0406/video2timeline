@@ -19,7 +19,7 @@ ITEM_REFRESH_RESULT_SCHEMA_VERSION = "timeline_for_video.item_refresh_result.v1"
 ITEM_LIST_RESULT_SCHEMA_VERSION = "timeline_for_video.item_list_result.v1"
 ITEM_DOWNLOAD_RESULT_SCHEMA_VERSION = "timeline_for_video.item_download_result.v1"
 ITEM_REMOVE_RESULT_SCHEMA_VERSION = "timeline_for_video.item_remove_result.v1"
-PIPELINE_VERSION = "timeline_for_video.pipeline.m9"
+PIPELINE_VERSION = "timeline_for_video.pipeline.m10"
 
 
 def refresh_items(
@@ -310,16 +310,14 @@ def build_timeline(
 
     text_events = frame_ocr_events(frame_ocr)
     for segment in audio_text_summary(audio_analysis)["segments"]:
-        text = segment.get("text") or segment.get("phone_tokens") or ""
-        event_type = "audio_acoustic_units" if segment.get("phone_tokens") else "audio_text_segment"
         text_events.append(
             {
-                "eventType": event_type,
+                "eventType": "audio_transcript_segment",
                 "startSec": segment.get("start_sec"),
                 "endSec": segment.get("end_sec"),
-                "text": text,
-                "unit_type": segment.get("unit_type"),
+                "text": segment.get("text") or "",
                 "speaker": segment.get("speaker"),
+                "speakerAssignment": segment.get("speakerAssignment"),
                 "source": "audio_analysis",
             }
         )
@@ -653,7 +651,7 @@ def empty_audio_list_summary() -> dict[str, Any]:
         "available": False,
         "speechCandidates": 0,
         "diarizationStatus": None,
-        "acousticUnitStatus": None,
+        "transcriptionStatus": None,
         "audioArtifact": None,
         "audioArtifactIncludedInDownloadZip": False,
     }
@@ -667,7 +665,7 @@ def audio_list_summary(audio_analysis: dict[str, Any]) -> dict[str, Any]:
         "available": bool(audio_analysis.get("available")),
         "speechCandidates": int(audio_analysis.get("speechCandidates") or 0),
         "diarizationStatus": audio_analysis.get("diarizationStatus"),
-        "acousticUnitStatus": audio_analysis.get("acousticUnitStatus"),
+        "transcriptionStatus": audio_analysis.get("transcriptionStatus"),
         "audioArtifact": artifact.get("path"),
         "audioArtifactIncludedInDownloadZip": bool(artifact.get("includedInDownloadZip", False)),
     }
@@ -1067,7 +1065,7 @@ def audio_analysis_summary(audio_analysis: dict[str, Any] | None) -> dict[str, A
             "audioArtifact": None,
             "speechCandidates": 0,
             "diarizationStatus": None,
-            "acousticUnitStatus": None,
+            "transcriptionStatus": None,
         }
     return {
         "available": True,
@@ -1075,7 +1073,7 @@ def audio_analysis_summary(audio_analysis: dict[str, Any] | None) -> dict[str, A
         "audioArtifact": audio_analysis.get("audioArtifact", {}),
         "speechCandidates": audio_analysis_speech_candidate_count(audio_analysis),
         "diarizationStatus": audio_analysis.get("diarization", {}).get("status"),
-        "acousticUnitStatus": audio_analysis.get("acousticUnits", {}).get("status"),
+        "transcriptionStatus": audio_analysis.get("transcription", {}).get("status"),
     }
 
 

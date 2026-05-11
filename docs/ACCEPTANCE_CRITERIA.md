@@ -6,7 +6,7 @@
 - `health` works.
 - `doctor` checks runtime and configured paths.
 - `models list` reports Audio-compatible model rows, pipeline generation
-  signature, Video runtime components, and pyannote/ZIPA readiness.
+  signature, Video runtime components, and pyannote/faster-whisper readiness.
 - `models list --include-remote --json` attaches Hugging Face metadata to
   Hugging Face model rows.
 - `files list` discovers video files from file and directory inputs.

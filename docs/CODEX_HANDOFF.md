@@ -36,7 +36,7 @@ Build:
 - extracted review frames
 - local OCR over generated frame images, following the TimelineForImage
   processing contract inside this repo
-- source-safe audio derivative analysis plus pyannote/ZIPA audio-model execution
+- source-safe audio derivative analysis plus pyannote/faster-whisper audio-model execution
   paths, following TimelineForAudio behavior inside this repo
 - contact sheet
 - per-item structured outputs

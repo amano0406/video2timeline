@@ -36,7 +36,7 @@ images, and source-safe audio evidence.
 
 Frame OCR follows the `TimelineForImage` processing contract but is implemented
 inside this repository. Video audio follows `TimelineForAudio` behavior,
-including pyannote diarization and ZIPA acoustic-unit execution paths, but is
+including pyannote diarization and faster-whisper transcription execution paths, but is
 implemented inside this repository. Do not import or share source code between
 Timeline products.
 

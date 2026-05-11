@@ -27,12 +27,12 @@ MAX_FFMPEG_TIMEOUT_SEC = 3600
 FFMPEG_TIMEOUT_DURATION_DIVISOR = 90
 FFMPEG_TIMEOUT_MARGIN_SEC = 120
 
-# These identifiers intentionally match the current TimelineForAudio behavior.
-# TimelineForVideo does not import or share that implementation.
+# These identifiers are implemented locally. TimelineForVideo does not import
+# or share TimelineForAudio/Image implementation code.
 AUDIO_REFERENCE_DIARIZATION_MODEL_ID = "pyannote/speaker-diarization-community-1"
-AUDIO_REFERENCE_ACOUSTIC_UNIT_BACKEND = "zipa-large-crctc-300k-onnx-v1"
-AUDIO_REFERENCE_ACOUSTIC_UNIT_MODEL_ID = "anyspeech/zipa-large-crctc-300k"
-AUDIO_REFERENCE_ACOUSTIC_UNIT_TYPE = "phone_like"
+AUDIO_REFERENCE_TRANSCRIPTION_BACKEND = "faster-whisper"
+AUDIO_REFERENCE_TRANSCRIPTION_MODEL_ID = "Systran/faster-whisper-large-v3"
+AUDIO_REFERENCE_TRANSCRIPTION_MODEL_ALIAS = "faster_whisper_large_v3"
 
 
 def analyze_audio_files(
@@ -83,7 +83,7 @@ def analyze_audio_files(
             "speechCandidates": sum(record["speechActivity"]["counts"]["speechCandidates"] for record in records),
             "audioModelRuns": sum(1 for record in records if record["audioModels"]["mode"] != "off"),
             "diarizationTurns": sum(model_turn_count(record["diarization"]) for record in records),
-            "acousticUnitTurns": sum(model_turn_count(record["acousticUnits"]) for record in records),
+            "transcriptionSegments": sum(transcription_segment_count(record["transcription"]) for record in records),
         },
         "records": records,
     }
@@ -178,25 +178,23 @@ def analyze_probe_record_audio(
                 "TimelineForVideo runs compatible audio models only when prerequisites are available."
             ],
         },
-        "acousticUnits": {
+        "transcription": {
             "status": "not_run",
-            "backend": AUDIO_REFERENCE_ACOUSTIC_UNIT_BACKEND,
-            "model_id": AUDIO_REFERENCE_ACOUSTIC_UNIT_MODEL_ID,
-            "unit_type": AUDIO_REFERENCE_ACOUSTIC_UNIT_TYPE,
-            "turn_count": 0,
+            "backend": AUDIO_REFERENCE_TRANSCRIPTION_BACKEND,
+            "model_id": AUDIO_REFERENCE_TRANSCRIPTION_MODEL_ID,
+            "model_alias": AUDIO_REFERENCE_TRANSCRIPTION_MODEL_ALIAS,
+            "segment_count": 0,
             "warning_count": 1,
-            "turns": [],
+            "segments": [],
             "warnings": [
-                "TimelineForVideo runs compatible acoustic-unit extraction only when prerequisites are available."
+                "TimelineForVideo runs Whisper transcription only when prerequisites are available."
             ],
         },
         "text": {
-            "mode": "audio_reference_units",
+            "mode": "whisper_transcript",
             "readableText": "",
             "segments": [],
-            "warnings": [
-                "TimelineForAudio currently stores phone-like acoustic units, not readable prose transcripts."
-            ],
+            "warnings": [],
         },
         "audioModels": {
             "mode": audio_model_mode or "required",
@@ -227,7 +225,7 @@ def analyze_probe_record_audio(
         )
         record["audioModels"] = model_result
         record["diarization"] = model_result["diarization"]
-        record["acousticUnits"] = model_result["acousticUnits"]
+        record["transcription"] = model_result["transcription"]
         record["text"] = model_result["text"]
         warnings.extend(model_result.get("warnings", []))
         record["ok"] = model_result["ok"]
@@ -281,7 +279,7 @@ def analyze_probe_record_audio(
         record["audioModelInput"].update(cleanup_result)
     record["audioModels"] = model_result
     record["diarization"] = model_result["diarization"]
-    record["acousticUnits"] = model_result["acousticUnits"]
+    record["transcription"] = model_result["transcription"]
     record["text"] = model_result["text"]
     warnings.extend(model_result.get("warnings", []))
 
@@ -530,3 +528,7 @@ def write_audio_analysis(record: dict[str, Any], path: Path) -> dict[str, Any]:
 
 def model_turn_count(payload: dict[str, Any]) -> int:
     return int(payload.get("turn_count") or 0)
+
+
+def transcription_segment_count(payload: dict[str, Any]) -> int:
+    return int(payload.get("segment_count") or 0)

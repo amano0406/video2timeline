@@ -20,10 +20,9 @@ def audio_status(*, token_configured: bool = False) -> dict[str, object]:
         "pyannote.audio": True,
         "torch": True,
         "torchaudio": True,
-        "onnxruntime": True,
+        "faster_whisper": True,
+        "ctranslate2": True,
         "huggingface_hub": True,
-        "lhotse": True,
-        "numpy": True,
     }
     return {
         "ready": token_configured,
@@ -34,10 +33,10 @@ def audio_status(*, token_configured: bool = False) -> dict[str, object]:
             "modelId": "pyannote/speaker-diarization-community-1",
             "ready": token_configured,
         },
-        "acousticUnits": {
-            "backend": "zipa-large-crctc-300k-onnx-v1",
-            "modelId": "anyspeech/zipa-large-crctc-300k",
-            "unitType": "phone_like",
+        "transcription": {
+            "backend": "faster-whisper",
+            "modelId": "Systran/faster-whisper-large-v3",
+            "modelAlias": "faster_whisper_large_v3",
             "ready": True,
         },
     }
@@ -75,8 +74,8 @@ class ModelInventoryTests(unittest.TestCase):
         self.assertEqual(rows["speaker_diarization"]["model_id"], "pyannote/speaker-diarization-community-1")
         self.assertTrue(rows["speaker_diarization"]["requires_huggingface_token"])
         self.assertTrue(rows["speaker_diarization"]["requires_access_approval"])
-        self.assertEqual(rows["acoustic_unit_extraction"]["model_id"], "anyspeech/zipa-large-crctc-300k")
-        self.assertEqual(rows["acoustic_unit_extraction"]["unit_type"], "phone_like")
+        self.assertEqual(rows["speech_transcription"]["model_id"], "Systran/faster-whisper-large-v3")
+        self.assertEqual(rows["speech_transcription"]["backend"], "faster-whisper")
         self.assertEqual(rows["speech_candidate_detection"]["model_id"], "ffmpeg-silencedetect-noise-35db")
         self.assertEqual(rows["frame_ocr"]["model_id"], "tesseract:jpn+eng")
         self.assertFalse(payload["sourceVideoSafety"]["sourceVideoModified"])
@@ -86,8 +85,8 @@ class ModelInventoryTests(unittest.TestCase):
         components = {component["id"]: component for component in payload["components"]}
         self.assertTrue(components["frame_visual_features"]["runtime"]["ready"])
         self.assertFalse(components["speaker_diarization"]["runtime"]["details"]["componentReady"])
-        self.assertTrue(components["acoustic_units"]["runtime"]["details"]["componentReady"])
-        self.assertFalse(components["acoustic_units"]["runtime"]["details"]["audioModelsReady"])
+        self.assertTrue(components["speech_transcription"]["runtime"]["details"]["componentReady"])
+        self.assertFalse(components["speech_transcription"]["runtime"]["details"]["audioModelsReady"])
 
     def test_inventory_marks_local_runtime_failure_as_not_ok(self) -> None:
         failed_ffmpeg = {
@@ -150,7 +149,7 @@ class ModelInventoryTests(unittest.TestCase):
 
         rows = {row["role"]: row for row in payload["models"]}
         self.assertEqual(rows["speaker_diarization"]["huggingface"], remote)
-        self.assertEqual(rows["acoustic_unit_extraction"]["huggingface"], remote)
+        self.assertEqual(rows["speech_transcription"]["huggingface"], remote)
         self.assertNotIn("huggingface", rows["speech_candidate_detection"])
         self.assertNotIn("huggingface", rows["frame_ocr"])
         self.assertEqual(fetch.call_count, 2)

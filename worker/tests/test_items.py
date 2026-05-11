@@ -152,17 +152,21 @@ class ItemsTests(unittest.TestCase):
                             ],
                         },
                         "diarization": {"status": "not_run"},
-                        "acousticUnits": {"status": "not_run"},
+                        "transcription": {"status": "ok"},
                         "text": {
-                            "mode": "audio_reference_units",
-                            "readableText": "",
+                            "mode": "whisper_transcript",
+                            "readableText": "こんにちは",
                             "segments": [
                                 {
                                     "start_sec": 0.0,
                                     "end_sec": 4.0,
                                     "speaker": "SPEAKER_00",
-                                    "phone_tokens": "ko n ni chi wa",
-                                    "unit_type": "phone_like",
+                                    "speakerAssignment": {
+                                        "method": "max_overlap",
+                                        "speaker": "SPEAKER_00",
+                                        "overlapSec": 4.0,
+                                    },
+                                    "text": "こんにちは",
                                 }
                             ],
                         },
@@ -230,7 +234,7 @@ class ItemsTests(unittest.TestCase):
             self.assertIn("text", timeline["lanes"])
             self.assertIn("frame_sample", {event["eventType"] for event in timeline["lanes"]["visual"]})
             self.assertIn("frame_ocr_text", {event["eventType"] for event in timeline["lanes"]["text"]})
-            self.assertIn("audio_acoustic_units", {event["eventType"] for event in timeline["lanes"]["text"]})
+            self.assertIn("audio_transcript_segment", {event["eventType"] for event in timeline["lanes"]["text"]})
             self.assertIn("audio_speech_candidate", {event["eventType"] for event in timeline["lanes"]["audio"]})
             self.assertIs(convert_info["source_video_modified"], False)
             self.assertEqual(convert_info["ffmpegVersion"]["versionLine"], "ffmpeg fake 1.0")
