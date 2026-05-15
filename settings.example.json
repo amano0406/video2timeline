@@ -1,9 +1,13 @@
 {
   "schemaVersion": 1,
+  "runtime": {
+    "instanceName": "",
+    "apiPort": 19500
+  },
   "inputRoots": [
-    "C:\\TimelineData\\input-video\\"
+    "C:\\apps\\Timeline\\data\\input\\video"
   ],
-  "outputRoot": "C:\\TimelineData\\video",
+  "outputRoot": "C:\\apps\\Timeline\\data\\to_text\\video",
   "huggingFaceToken": "",
   "computeMode": "gpu"
 }

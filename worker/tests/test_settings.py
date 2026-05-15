@@ -35,6 +35,38 @@ class SettingsTests(unittest.TestCase):
             },
         )
 
+    def test_normalize_settings_preserves_runtime_metadata(self) -> None:
+        settings = normalize_settings(
+            {
+                "schemaVersion": 1,
+                "inputRoots": ["C:\\TimelineData\\input-video"],
+                "outputRoot": "C:\\TimelineData\\video",
+                "runtime": {
+                    "instanceName": "LOCAL-ABC123",
+                    "apiPort": 19500,
+                },
+            }
+        )
+
+        self.assertEqual(settings["runtime"], {"instanceName": "abc123", "apiPort": 19500})
+        self.assertEqual(
+            list(settings.keys()),
+            ["schemaVersion", "runtime", "inputRoots", "outputRoot", "huggingFaceToken", "computeMode"],
+        )
+
+    def test_normalize_settings_rejects_invalid_runtime_port(self) -> None:
+        with self.assertRaises(SettingsError):
+            normalize_settings(
+                {
+                    "schemaVersion": 1,
+                    "inputRoots": ["C:\\TimelineData\\input-video"],
+                    "outputRoot": "C:\\TimelineData\\video",
+                    "runtime": {
+                        "apiPort": 70000,
+                    },
+                }
+            )
+
     def test_normalize_settings_rejects_empty_output_root(self) -> None:
         with self.assertRaises(SettingsError):
             normalize_settings(

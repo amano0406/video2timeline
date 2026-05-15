@@ -733,25 +733,8 @@ def removal_targets(output_root: Path, item_ids: list[str] | None = None) -> dic
     selected_roots, missing_item_ids = selected_item_roots(output_root, selected_ids)
 
     for item_dir in selected_roots:
-        files.extend(
-            path
-            for path in generated_item_files(
-                item_dir,
-                include_audio_artifacts=True,
-                include_image_artifacts=True,
-            )
-            if path.exists()
-        )
-        directories.extend(
-            [
-                item_dir / "artifacts" / "audio",
-                item_dir / "artifacts" / "ocr",
-                item_dir / "artifacts" / "frames",
-                item_dir / "artifacts",
-                item_dir / "raw_outputs",
-                item_dir,
-            ]
-        )
+        files.extend(generated_removal_files(item_dir))
+        directories.extend(generated_removal_directories(item_dir))
 
     if not selected_ids:
         downloads_dir = output_root / "downloads"
@@ -780,6 +763,22 @@ def removal_targets(output_root: Path, item_ids: list[str] | None = None) -> dic
         "directories": sorted(unique_existing_paths(directories), key=lambda path: len(path.parts), reverse=True),
         "missingItemIds": missing_item_ids,
     }
+
+
+def generated_removal_files(root: Path) -> list[Path]:
+    if root.is_file() or root.is_symlink():
+        return [root]
+    if not root.is_dir():
+        return []
+    return sorted((path for path in root.rglob("*") if path.is_file() or path.is_symlink()), key=lambda path: str(path))
+
+
+def generated_removal_directories(root: Path) -> list[Path]:
+    if not root.is_dir() or root.is_symlink():
+        return []
+    directories = [path for path in root.rglob("*") if path.is_dir() and not path.is_symlink()]
+    directories.append(root)
+    return directories
 
 
 def unique_existing_paths(paths: list[Path]) -> list[Path]:

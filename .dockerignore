@@ -6,6 +6,10 @@ __pycache__/
 .ruff_cache/
 .venv/
 venv/
+bin/
+obj/
+**/bin/
+**/obj/
 
 settings.json
 downloads/

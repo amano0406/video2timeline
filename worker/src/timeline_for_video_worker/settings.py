@@ -14,9 +14,14 @@ SETTINGS_EXAMPLE_PATH_ENV = "TIMELINE_FOR_VIDEO_SETTINGS_EXAMPLE_PATH"
 INTERNAL_STATE_ROOT_ENV = "TIMELINE_FOR_VIDEO_INTERNAL_STATE_ROOT"
 HUGGING_FACE_TOKEN_ENV = "TIMELINE_FOR_VIDEO_HUGGING_FACE_TOKEN"
 SUPPORTED_COMPUTE_MODES = ("cpu", "gpu")
+DEFAULT_API_PORT = 19500
 
 DEFAULT_SETTINGS: dict[str, Any] = {
     "schemaVersion": SCHEMA_VERSION,
+    "runtime": {
+        "instanceName": "",
+        "apiPort": DEFAULT_API_PORT,
+    },
     "inputRoots": ["C:\\TimelineData\\input-video\\"],
     "outputRoot": "C:\\TimelineData\\video",
     "huggingFaceToken": "",
@@ -119,13 +124,53 @@ def normalize_settings(raw: dict[str, Any]) -> dict[str, Any]:
     if compute_mode not in SUPPORTED_COMPUTE_MODES:
         raise SettingsError(f"computeMode must be one of: {', '.join(SUPPORTED_COMPUTE_MODES)}")
 
-    return {
+    runtime = normalize_runtime_settings(raw.get("runtime"))
+    normalized: dict[str, Any] = {
         "schemaVersion": SCHEMA_VERSION,
-        "inputRoots": input_roots,
-        "outputRoot": output_root_raw.strip(),
-        "huggingFaceToken": token_raw.strip(),
-        "computeMode": compute_mode,
     }
+    if runtime:
+        normalized["runtime"] = runtime
+    normalized.update(
+        {
+            "inputRoots": input_roots,
+            "outputRoot": output_root_raw.strip(),
+            "huggingFaceToken": token_raw.strip(),
+            "computeMode": compute_mode,
+        }
+    )
+
+    return normalized
+
+
+def normalize_runtime_settings(raw: Any) -> dict[str, Any]:
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise SettingsError("runtime must be an object when configured.")
+
+    normalized: dict[str, Any] = {}
+
+    instance_name = raw.get("instanceName", "")
+    if instance_name is None:
+        instance_name = ""
+    if not isinstance(instance_name, str):
+        raise SettingsError("runtime.instanceName must be a string when configured.")
+    instance_name = instance_name.strip().lower()
+    if instance_name.startswith("local-"):
+        instance_name = instance_name[6:]
+    if instance_name:
+        normalized["instanceName"] = instance_name
+
+    api_port = raw.get("apiPort", DEFAULT_API_PORT)
+    if api_port is None or api_port == "":
+        api_port = DEFAULT_API_PORT
+    if not isinstance(api_port, int):
+        raise SettingsError("runtime.apiPort must be an integer when configured.")
+    if api_port < 1 or api_port > 65535:
+        raise SettingsError("runtime.apiPort must be between 1 and 65535.")
+    normalized["apiPort"] = api_port
+
+    return normalized
 
 
 def save_settings(settings: dict[str, Any], path: Path | None = None) -> dict[str, Any]:

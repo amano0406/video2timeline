@@ -1,11 +1,23 @@
-name: timeline-for-video
-
 services:
+  health-api:
+    image: timeline-for-video-health-api:${TIMELINE_FOR_VIDEO_IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: docker/health-api.Dockerfile
+    environment:
+      ASPNETCORE_URLS: http://0.0.0.0:8080
+      TIMELINE_FOR_VIDEO_SETTINGS_PATH: ${TIMELINE_FOR_VIDEO_SETTINGS_PATH:-/workspace/settings.json}
+    ports:
+      - "127.0.0.1:${TIMELINE_FOR_VIDEO_API_PORT:-19500}:8080"
+    volumes:
+      - ./:/workspace
+
   worker:
-    image: timeline-for-video-worker:latest
+    image: timeline-for-video-worker:${TIMELINE_FOR_VIDEO_IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: docker/worker.Dockerfile
+    entrypoint: ["sleep", "infinity"]
     environment:
       TIMELINE_FOR_VIDEO_IN_DOCKER: "1"
       TIMELINE_FOR_VIDEO_WORKER_FLAVOR: cpu
@@ -33,4 +45,6 @@ services:
 
 volumes:
   app-data:
+    name: timeline-for-video-${TIMELINE_FOR_VIDEO_INSTANCE_NAME:-default}-app-data
   cache-data:
+    name: timeline-for-video-${TIMELINE_FOR_VIDEO_INSTANCE_NAME:-default}-cache-data

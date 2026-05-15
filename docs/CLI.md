@@ -86,8 +86,9 @@ item refresh in one bounded command.
 - `items download` creates a source-safe ZIP and updates `latest`. Use
   `--item-id` repeatedly or comma-separated to include selected items.
 - `items remove --dry-run` reports generated artifacts that would be removed.
-- `items remove` removes known generated artifacts only. Use `--item-id`
-  repeatedly or comma-separated to remove selected generated item artifacts.
+- `items remove` removes generated item artifacts under `outputRoot`. Use
+  `--item-id` repeatedly or comma-separated to remove selected generated item
+  artifacts.
 
 ## Worker Runs
 
@@ -98,8 +99,9 @@ item refresh in one bounded command.
 .\cli.ps1 serve --once --json
 ```
 
-`serve` is the resident worker command used by Docker. It repeats changed-video
-refresh on an interval and records run state under the internal app-data area.
+`serve` is the manual resident worker command. Docker startup does not run it
+automatically. When explicitly invoked, it repeats changed-video refresh on an
+interval and records run state under the internal app-data area.
 Failed pipeline steps are exposed as `failedSteps` in JSON run output and are
 shown in worker logs.
 

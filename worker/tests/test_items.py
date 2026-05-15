@@ -379,6 +379,9 @@ class ItemsTests(unittest.TestCase):
             refresh_result = refresh_items([video_file], str(output_root), ffprobe_bin=fake_ffprobe, max_items=1)
             download_items(str(output_root))
             item_root = Path(refresh_result["records"][0]["itemRoot"])
+            processing_dir = item_root / "artifacts" / "audio" / ".processing"
+            processing_dir.mkdir(parents=True)
+            (processing_dir / "normalized_audio.wav").write_bytes(b"temporary audio")
 
             dry_run = remove_items(str(output_root), dry_run=True)
             self.assertGreater(dry_run["counts"]["targetFiles"], 0)
@@ -389,6 +392,8 @@ class ItemsTests(unittest.TestCase):
             self.assertTrue(result["ok"])
             self.assertFalse(result["sourceVideosRemoved"])
             self.assertFalse((item_root / "video_record.json").exists())
+            self.assertFalse(processing_dir.exists())
+            self.assertFalse(item_root.exists())
             self.assertFalse((output_root / "latest" / "items.zip").exists())
             self.assertTrue(source.exists())
             self.assertEqual(source.read_bytes(), b"video")

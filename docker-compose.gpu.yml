@@ -1,6 +1,6 @@
 services:
   worker:
-    image: timeline-for-video-worker-gpu:latest
+    image: timeline-for-video-worker-gpu:${TIMELINE_FOR_VIDEO_IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: docker/worker.gpu.Dockerfile
